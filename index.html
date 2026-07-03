@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pathfinder — Your College Counselor</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-logo">🧭</div>
+    <div>
+      <div class="brand-name">Pathfinder</div>
+      <div class="brand-sub">Your college counselor</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" data-view="dashboard"><span class="nav-ico">🏠</span> Dashboard</button>
+    <button class="nav-item" data-view="profile"><span class="nav-ico">👤</span> My Profile</button>
+    <button class="nav-item" data-view="majors"><span class="nav-ico">🎯</span> Major Match</button>
+    <button class="nav-item" data-view="courses"><span class="nav-ico">📚</span> Course Planner</button>
+    <button class="nav-item" data-view="colleges"><span class="nav-ico">🏛️</span> Colleges</button>
+    <button class="nav-item" data-view="essays"><span class="nav-ico">✍️</span> Essay Coach</button>
+    <button class="nav-item" data-view="opps"><span class="nav-ico">🌟</span> Opportunities</button>
+  </nav>
+  <div class="nav nav-bottom">
+    <button class="nav-item" id="theme-toggle"><span class="nav-ico">🌙</span> Dark mode</button>
+  </div>
+  <div class="sidebar-foot">Data stays in your browser.</div>
+</aside>
+
+<main class="main">
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="view active" id="view-dashboard">
+    <div id="dash-hero"></div>
+
+    <div class="stat-grid" id="dash-stats"></div>
+
+    <div class="two-col">
+      <div class="card">
+        <h2>⏰ Upcoming deadlines</h2>
+        <div id="dash-deadlines"></div>
+      </div>
+      <div class="card">
+        <h2>✅ My to-do list</h2>
+        <div id="dash-tasks"></div>
+        <div class="add-task-row">
+          <input type="text" id="new-task-input" placeholder="Add your own task…">
+          <button class="btn btn-primary" id="add-task-btn">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗺️ Where you are on the road to college</h2>
+      <div id="dash-timeline" class="timeline"></div>
+    </div>
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section class="view" id="view-profile">
+    <header class="view-head">
+      <h1>My Profile</h1>
+      <p class="muted">This powers your recommendations everywhere else — the more you fill in, the smarter Pathfinder gets.</p>
+    </header>
+
+    <div class="card">
+      <h2>🪪 The basics</h2>
+      <div class="form-grid">
+        <label>First name
+          <input type="text" id="p-name" placeholder="e.g. Jordan">
+        </label>
+        <label>Your high school
+          <input type="text" id="p-school" placeholder="e.g. Lincoln High School">
+        </label>
+        <label>High school graduation year
+          <select id="p-gradyear"></select>
+        </label>
+        <label>Home state (for in-state suggestions)
+          <input type="text" id="p-state" placeholder="e.g. California">
+        </label>
+        <label>Unweighted GPA (out of 4.0)
+          <input type="number" id="p-gpa" min="0" max="4" step="0.01" placeholder="e.g. 3.75">
+        </label>
+        <label>SAT score (or leave blank)
+          <input type="number" id="p-sat" min="400" max="1600" step="10" placeholder="e.g. 1350">
+        </label>
+        <label>ACT score (optional — converted to SAT for matching)
+          <input type="number" id="p-act" min="1" max="36" step="1" placeholder="e.g. 29">
+        </label>
+        <label>Intended major (or take the quiz! 🎯)
+          <select id="p-major"></select>
+        </label>
+      </div>
+      <label class="full-label">Interests, hobbies, things you care about
+        <textarea id="p-interests" rows="2" placeholder="e.g. robotics, hospital volunteering, drawing, debate…"></textarea>
+      </label>
+      <div class="row-end">
+        <button class="btn btn-primary" id="save-profile-btn">Save profile</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎪 Clubs & activities <span class="muted small">(tap everything you do — saves instantly)</span></h2>
+      <div class="club-chips" id="club-chips"></div>
+      <div class="add-task-row">
+        <input type="text" id="new-club-input" placeholder="Add your own club or activity…">
+        <button class="btn btn-primary" id="add-club-btn">Add</button>
+      </div>
+      <div class="lead-row">
+        <label class="inline-label">My biggest leadership role so far:
+          <select id="p-leadership">
+            <option value="none">No leadership roles yet</option>
+            <option value="member">Committed, active member</option>
+            <option value="officer">Club officer (secretary, treasurer…)</option>
+            <option value="president">President, captain, or founder</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🧮 GPA converter <span class="muted small">(weighted → unweighted)</span></h2>
+      <p class="muted small" style="margin-bottom:12px">College matching here uses your <strong>unweighted</strong> GPA (max 4.0). Only know your weighted one? Estimate it:</p>
+      <div class="conv-grid">
+        <label>My weighted GPA
+          <input type="number" id="conv-weighted" min="0" max="6" step="0.01" placeholder="e.g. 4.3">
+        </label>
+        <label>My school's scale
+          <select id="conv-scale">
+            <option value="5">out of 5.0</option>
+            <option value="4.5">out of 4.5</option>
+            <option value="6">out of 6.0</option>
+          </select>
+        </label>
+        <div class="conv-out"><span class="muted small">≈ unweighted</span><div class="conv-num" id="conv-result">—</div></div>
+        <button class="btn btn-primary" id="conv-apply" disabled>Use as my GPA</button>
+      </div>
+      <p class="muted small" style="margin-top:10px">Rough estimate — for the exact number, average your letter grades (A = 4, B = 3…) ignoring honors/AP bumps.</p>
+    </div>
+
+    <div class="card tip-card">
+      💡 <strong>No test score yet?</strong> That's fine — college matching will use your GPA alone until you add one. Juniors usually take the SAT/ACT in spring. Your activities and leadership boost your admission-chance estimates too.
+    </div>
+  </section>
+
+  <!-- ============ MAJOR MATCH ============ -->
+  <section class="view" id="view-majors">
+    <header class="view-head">
+      <h1>Major Match</h1>
+      <p class="muted">Already know your path? Pick it below. Not sure? The quiz will suggest majors that fit how you actually think.</p>
+    </header>
+
+    <div class="card major-pick-card">
+      <h2>🎯 My major</h2>
+      <label class="inline-label">I want to study:
+        <select id="major-select"></select>
+      </label>
+      <div id="chosen-major-card"></div>
+    </div>
+
+    <div class="card" id="quiz-card">
+      <h2>🧪 Not sure? Take the 2-minute quiz</h2>
+      <div id="quiz-questions"></div>
+      <div class="row-end">
+        <button class="btn btn-ghost" id="quiz-reset-btn">Start over</button>
+        <button class="btn btn-primary" id="quiz-submit-btn">See my matches →</button>
+      </div>
+    </div>
+    <div id="quiz-results"></div>
+  </section>
+
+  <!-- ============ COURSE PLANNER ============ -->
+  <section class="view" id="view-courses">
+    <header class="view-head">
+      <h1>Course Planner</h1>
+      <p class="muted">A 4-year high school plan tuned to where you're headed. Colleges care most that you challenged yourself in the subjects tied to your major.</p>
+    </header>
+    <div class="card">
+      <label class="inline-label">I'm aiming toward:
+        <select id="track-select"></select>
+      </label>
+      <div id="track-plan"></div>
+    </div>
+  </section>
+
+  <!-- ============ COLLEGES ============ -->
+  <section class="view" id="view-colleges">
+    <header class="view-head">
+      <h1>Colleges</h1>
+      <p class="muted">Build a balanced list: aim for ~2–3 safeties, 3–4 matches, and 2–3 reaches.</p>
+    </header>
+
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="explore">🔍 Explore colleges</button>
+      <button class="subtab" data-subtab="mylist">📋 My list & tracker <span class="pill" id="mylist-count">0</span></button>
+    </div>
+
+    <div class="subview active" id="subview-explore">
+      <div class="card filter-card">
+        <input type="text" id="college-search" placeholder="Search by name, state, or major…">
+        <select id="college-fit-filter">
+          <option value="all">All fits</option>
+          <option value="Safety">Safeties</option>
+          <option value="Match">Matches</option>
+          <option value="Reach">Reaches</option>
+        </select>
+        <select id="college-type-filter">
+          <option value="all">Public & private</option>
+          <option value="Public">Public only</option>
+          <option value="Private">Private only</option>
+        </select>
+        <select id="college-sort">
+          <option value="chance">Best odds first</option>
+          <option value="acc-asc">Most selective first</option>
+          <option value="acc-desc">Easiest admit first</option>
+          <option value="name">A → Z</option>
+        </select>
+      </div>
+      <p class="muted small" id="fit-note"></p>
+      <div id="college-list" class="college-grid"></div>
+    </div>
+
+    <div class="subview" id="subview-mylist">
+      <div class="card">
+        <div id="list-balance"></div>
+        <div id="mylist-body"></div>
+      </div>
+      <div class="card tip-card">💡 <strong>ED</strong> = Early Decision (binding — you must attend if accepted). <strong>EA</strong> = Early Action (non-binding, usually Nov 1). <strong>RD</strong> = Regular Decision (usually Jan 1–15).</div>
+    </div>
+  </section>
+
+  <!-- ============ ESSAY COACH ============ -->
+  <section class="view" id="view-essays">
+    <header class="view-head">
+      <h1>Essay Coach</h1>
+      <p class="muted">Your Common App personal statement: max 650 words. The goal is simple — after reading it, an admissions officer should feel like they've met you.</p>
+    </header>
+
+    <div class="two-col">
+      <div class="card">
+        <h2>1 · Pick a prompt</h2>
+        <div id="essay-prompts"></div>
+      </div>
+      <div class="card">
+        <h2>2 · Brainstorm</h2>
+        <p class="muted small">Jot quick answers — one of these usually becomes your essay.</p>
+        <ul class="brainstorm-list" id="brainstorm-list"></ul>
+        <h2 style="margin-top:18px">Structure that works</h2>
+        <ol class="structure-list">
+          <li><strong>Hook (1 short paragraph):</strong> drop the reader into a specific moment.</li>
+          <li><strong>Story (2–3 paragraphs):</strong> what happened, what you did, what it felt like.</li>
+          <li><strong>Turn:</strong> what changed in how you think or act.</li>
+          <li><strong>So what:</strong> connect it to who you are now and who you're becoming.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Draft <span class="muted small" id="essay-autosave-note">(autosaves as you type)</span></h2>
+      <textarea id="essay-draft" rows="14" placeholder="Start writing… don't aim for perfect, aim for true."></textarea>
+      <div class="essay-toolbar">
+        <div class="wordcount" id="essay-wordcount">0 / 650 words</div>
+        <button class="btn btn-primary" id="essay-feedback-btn">Get feedback</button>
+      </div>
+      <div id="essay-feedback"></div>
+    </div>
+  </section>
+
+  <!-- ============ OPPORTUNITIES ============ -->
+  <section class="view" id="view-opps">
+    <header class="view-head">
+      <h1>Opportunities</h1>
+      <p class="muted">Selective summer programs and big scholarships. Strong summers are one of the best ways to stand out — and many of the best ones are free.</p>
+    </header>
+    <div class="subtabs">
+      <button class="subtab active" data-opptab="programs">☀️ Summer programs</button>
+      <button class="subtab" data-opptab="scholarships">💰 Scholarships</button>
+    </div>
+    <div class="card filter-card">
+      <input type="text" id="opp-search" placeholder="Search…">
+      <select id="opp-cat-filter"><option value="all">All categories</option></select>
+      <select id="opp-cost-filter">
+        <option value="all">Any cost</option>
+        <option value="free">Free (or paid TO you)</option>
+      </select>
+    </div>
+    <div id="opp-list" class="opp-grid"></div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
