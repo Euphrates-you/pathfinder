@@ -434,5 +434,5 @@ const TIMELINE = [
   { grade: "10th grade", items: ["Practice PSAT", "Take on more rigor (honors/AP)", "Apply to summer programs (deadlines Dec–Feb)", "Go deep in your best activities"] },
   { grade: "11th grade", items: ["PSAT in Oct (National Merit!)", "SAT/ACT in spring", "Lead something", "Build your college list", "Ask for rec letters in spring", "Start essays in summer"] },
   { grade: "12th grade (fall)", items: ["Finish essays by Oct", "Early Action/Decision apps due ~Nov 1", "FAFSA opens — file early", "Regular Decision apps due Jan 1–15"] },
-  { grade: "12th grade (spring)", items: ["Decisions arrive Dec–Apr", "Compare financial aid offers", "Apply to local scholarships", "Commit by May 1 🎉"] },
+  { grade: "12th grade (spring)", items: ["Decisions arrive Dec–Apr", "Compare financial aid offers", "Apply to local scholarships", "Commit by May 1"] },
 ];

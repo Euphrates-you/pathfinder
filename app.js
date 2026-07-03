@@ -1,4 +1,4 @@
-/* ============ Pathfinder — app logic (v2) ============ */
+/* ============ Pathfinder — app logic (v3, igloo edition) ============ */
 
 // ---------- state ----------
 const STORE_KEY = "pathfinder-state-v1";
@@ -7,15 +7,17 @@ const DEFAULTS = {
   profile: {
     name: "", school: "", gradYear: "", gpa: "", sat: "", act: "",
     state: "", interests: "", major: "", clubs: [], leadership: "none",
+    honors: [],
   },
-  myList: [],            // { name, status, appType, deadline }
+  myList: [],            // { name, status, appType, deadline, reqs }
+  customColleges: [],    // user-added schools, same shape as COLLEGES + custom:true
+  savedOpps: [],         // { name, kind: "program" | "scholarship" }
   tasksDone: {},         // id -> true
   customTasks: [],       // { id, text }
   removedTasks: {},      // id -> true (hidden defaults)
   quizAnswers: [],       // selected option index per question
   track: "undecided",
   essay: { prompt: 0, draft: "" },
-  theme: "light",
 };
 
 function loadState() {
@@ -30,7 +32,13 @@ const state = {
   essay: { ...DEFAULTS.essay, ...(_loaded.essay || {}) },
 };
 if (!Array.isArray(state.profile.clubs)) state.profile.clubs = [];
-state.myList.forEach((c) => { if (!c.reqs) c.reqs = {}; });
+if (!Array.isArray(state.profile.honors)) state.profile.honors = [];
+if (!Array.isArray(state.customColleges)) state.customColleges = [];
+if (!Array.isArray(state.savedOpps)) state.savedOpps = [];
+state.myList.forEach((c) => {
+  if (!c.reqs) c.reqs = {};
+  if (c.status === "Accepted 🎉") c.status = "Accepted"; // migrate pre-v3 label
+});
 
 function save() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
@@ -77,17 +85,10 @@ function currentGrade() {
 }
 const GRADE_NAMES = { 9: "Freshman", 10: "Sophomore", 11: "Junior", 12: "Senior" };
 
-// ---------- theme ----------
-function applyTheme() {
-  document.documentElement.dataset.theme = state.theme;
-  $("#theme-toggle").innerHTML = state.theme === "dark"
-    ? `<span class="nav-ico">☀️</span> Light mode`
-    : `<span class="nav-ico">🌙</span> Dark mode`;
+// built-in database + the user's own schools
+function allColleges() {
+  return COLLEGES.concat(state.customColleges);
 }
-$("#theme-toggle").addEventListener("click", () => {
-  state.theme = state.theme === "dark" ? "light" : "dark";
-  save(); applyTheme();
-});
 
 // ---------- navigation ----------
 $$(".nav-item").forEach((btn) => {
@@ -99,7 +100,10 @@ function showView(view) {
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
   if (view === "dashboard") renderDashboard();
   if (view === "colleges") renderColleges();
+  if (view === "profile") renderSavedOpps();
   window.scrollTo(0, 0);
+  const el = $("#view-" + view);
+  if (el && window.fxReveal) fxReveal(el);
 }
 
 // ============================================================
@@ -109,22 +113,22 @@ function renderDashboard() {
   renderHero();
 
   const words = countWords(state.essay.draft);
-  const submitted = state.myList.filter((c) => ["Submitted", "Accepted 🎉", "Waitlisted", "Denied"].includes(c.status)).length;
+  const submitted = state.myList.filter((c) => ["Submitted", "Accepted", "Waitlisted", "Denied"].includes(c.status)).length;
   const nextDl = upcomingDeadlines()[0];
   $("#dash-stats").innerHTML = `
-    <div class="stat"><div class="stat-ico i1">🏛️</div><div><div class="stat-num">${state.myList.length}</div><div class="stat-label">colleges on my list</div></div></div>
-    <div class="stat"><div class="stat-ico i2">📨</div><div><div class="stat-num">${submitted}</div><div class="stat-label">applications submitted</div></div></div>
-    <div class="stat"><div class="stat-ico i3">✍️</div><div><div class="stat-num">${words}<span style="font-size:13px;color:var(--ink-soft)"> / 650</span></div><div class="stat-label">essay words drafted</div></div></div>
-    <div class="stat"><div class="stat-ico i4">⏰</div><div><div class="stat-num">${nextDl ? nextDl.days + "d" : "—"}</div><div class="stat-label">${nextDl ? "until " + esc(nextDl.name) : "no deadlines set yet"}</div></div></div>`;
+    <div class="stat"><div class="stat-idx">01</div><div class="stat-num">${state.myList.length}</div><div class="stat-label">colleges on my list</div></div>
+    <div class="stat"><div class="stat-idx">02</div><div class="stat-num">${submitted}</div><div class="stat-label">applications submitted</div></div>
+    <div class="stat"><div class="stat-idx">03</div><div class="stat-num">${words}<span class="stat-sub"> / 650</span></div><div class="stat-label">essay words drafted</div></div>
+    <div class="stat"><div class="stat-idx">04</div><div class="stat-num">${nextDl ? nextDl.days + "d" : "—"}</div><div class="stat-label">${nextDl ? "until " + esc(nextDl.name) : "no deadlines set yet"}</div></div>`;
 
   const dls = upcomingDeadlines();
   $("#dash-deadlines").innerHTML = dls.length
     ? dls.slice(0, 6).map((d) => `
         <div class="deadline-row">
           <span><strong>${esc(d.name)}</strong> <span class="muted small">(${esc(d.appType)})</span></span>
-          <span class="deadline-days ${d.days <= 14 ? "soon" : "ok"}">${d.days} day${d.days === 1 ? "" : "s"}</span>
+          <span class="deadline-days ${d.days <= 14 ? "soon" : "ok"}">T−${d.days}D</span>
         </div>`).join("")
-    : `<p class="empty-note">No deadlines yet. Add colleges to <strong>My list</strong> and set their deadlines — they'll show up here with a countdown.</p>`;
+    : `<p class="empty-note">No deadlines yet. Add colleges to MY LIST and set their deadlines — they'll show up here with a countdown.</p>`;
 
   renderTasks();
   renderTimeline();
@@ -139,21 +143,22 @@ function renderHero() {
   const R = 30, CIRC = 2 * Math.PI * R;
 
   const chips = [];
-  if (grade) chips.push(`🎓 ${GRADE_NAMES[grade]}${p.school ? " at " + esc(p.school) : ""}`);
-  else if (p.school) chips.push(`🎓 ${esc(p.school)}`);
-  if (p.gradYear) chips.push(`🎉 Class of ${esc(p.gradYear)}`);
-  if (p.major) chips.push(`🎯 ${esc(p.major)}`);
-  if (p.clubs.length) chips.push(`🎪 ${p.clubs.length} activit${p.clubs.length === 1 ? "y" : "ies"}`);
+  if (grade) chips.push(`${GRADE_NAMES[grade]}${p.school ? " · " + esc(p.school) : ""}`);
+  else if (p.school) chips.push(esc(p.school));
+  if (p.gradYear) chips.push(`Class of ${esc(p.gradYear)}`);
+  if (p.major) chips.push(esc(p.major));
+  if (p.clubs.length) chips.push(`${p.clubs.length} activit${p.clubs.length === 1 ? "y" : "ies"}`);
+  if (p.honors.length) chips.push(`${p.honors.length} honor${p.honors.length === 1 ? "" : "s"}`);
 
   $("#dash-hero").innerHTML = `
     <div class="hero">
       <div class="hero-main">
-        <div class="hero-avatar">${p.name ? esc(p.name[0]) : "🧭"}</div>
+        <div class="hero-avatar">${p.name ? esc(p.name[0]) : "◆"}</div>
         <div class="hero-text">
-          <h1>${p.name ? `Hey, ${esc(p.name)}! 👋` : "Welcome to Pathfinder! 👋"}</h1>
+          <h1>${p.name ? `Welcome back, ${esc(p.name)}.` : "Welcome to Pathfinder."}</h1>
           <div class="hero-chips">
-            ${chips.join("") ? chips.map((c) => `<span class="hero-chip">${c}</span>`).join("") : ""}
-            ${!p.name || !p.gradYear ? `<button class="hero-chip click" id="hero-setup-btn">✨ Set up My Profile →</button>` : ""}
+            ${chips.map((c) => `<span class="hero-chip">${c}</span>`).join("")}
+            ${!p.name || !p.gradYear ? `<button class="hero-chip click" id="hero-setup-btn">SET UP MY PROFILE →</button>` : ""}
           </div>
         </div>
       </div>
@@ -278,7 +283,7 @@ function initProfile() {
     });
     setMajor($("#p-major").value, { silent: true });
     save();
-    toast("Profile saved ✓ Your recommendations just got smarter.");
+    toast("PROFILE SAVED — recommendations updated");
     renderDashboard();
     renderColleges();
   });
@@ -291,6 +296,12 @@ function initProfile() {
   renderClubChips();
   $("#add-club-btn").addEventListener("click", addClub);
   $("#new-club-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addClub(); });
+
+  renderHonorChips();
+  $("#add-honor-btn").addEventListener("click", addHonor);
+  $("#new-honor-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addHonor(); });
+
+  renderSavedOpps();
 
   // GPA converter
   const updateConverter = () => {
@@ -308,7 +319,7 @@ function initProfile() {
     state.profile.gpa = est;
     $("#p-gpa").value = est;
     save();
-    toast(`GPA set to ${est} ✓ (double-check against your transcript!)`);
+    toast(`GPA SET TO ${est} — double-check against your transcript`);
     renderColleges();
   });
 }
@@ -336,7 +347,68 @@ function addClub() {
   if (!state.profile.clubs.includes(club)) state.profile.clubs.push(club);
   input.value = "";
   save(); renderClubChips(); renderColleges();
-  toast(`${club} added ✓`);
+  toast(`${club.toUpperCase()} — added`);
+}
+
+// ----- honors & awards -----
+function renderHonorChips() {
+  const honors = state.profile.honors;
+  $("#honor-chips").innerHTML = honors.length
+    ? honors.map((h) => `<button class="club-chip selected" data-honor="${esc(h)}" title="Remove">${esc(h)} ✕</button>`).join("")
+    : `<p class="empty-note">No honors yet — add awards, competition wins, or scholarships you've already earned. They nudge your admission-chance estimates up too.</p>`;
+  $$("#honor-chips [data-honor]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      state.profile.honors = state.profile.honors.filter((h) => h !== chip.dataset.honor);
+      save(); renderHonorChips(); renderColleges(); renderDashboard();
+    });
+  });
+}
+
+function addHonor() {
+  const input = $("#new-honor-input");
+  const honor = input.value.trim();
+  if (!honor) return;
+  if (!state.profile.honors.includes(honor)) state.profile.honors.push(honor);
+  input.value = "";
+  save(); renderHonorChips(); renderColleges(); renderDashboard();
+  toast(`${honor.toUpperCase()} — added to honors`);
+}
+
+// ----- saved opportunities (programs & scholarships pinned to profile) -----
+function isOppSaved(name) {
+  return state.savedOpps.some((o) => o.name === name);
+}
+
+function toggleSavedOpp(name, kind) {
+  if (isOppSaved(name)) {
+    state.savedOpps = state.savedOpps.filter((o) => o.name !== name);
+    toast(`${name.toUpperCase()} — removed from profile`);
+  } else {
+    state.savedOpps.push({ name, kind });
+    toast(`${name.toUpperCase()} — saved to profile`);
+  }
+  save();
+  renderSavedOpps();
+  renderOpps();
+}
+
+function renderSavedOpps() {
+  const el = $("#saved-opps-body");
+  if (!el) return;
+  el.innerHTML = state.savedOpps.length
+    ? state.savedOpps.map((o) => `
+        <div class="saved-opp">
+          <span class="saved-kind">${o.kind === "program" ? "PROGRAM" : "SCHOLARSHIP"}</span>
+          <span class="saved-name">${esc(o.name)}</span>
+          <button class="task-del" data-unsave="${esc(o.name)}" title="Remove">✕</button>
+        </div>`).join("")
+    : `<p class="empty-note">Nothing saved yet — browse OPPORTUNITIES [ 07 ] and hit SAVE on the summer programs and scholarships you're targeting.</p>`;
+  $$("#saved-opps-body [data-unsave]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.savedOpps = state.savedOpps.filter((o) => o.name !== btn.dataset.unsave);
+      save(); renderSavedOpps(); renderOpps();
+    });
+  });
 }
 
 // ============================================================
@@ -366,7 +438,7 @@ function setMajor(name, { silent } = {}) {
   $("#p-major").value = name;
   $("#major-select").value = name;
   renderChosenMajor();
-  if (!silent) toast(name ? `${name} set as your major 🎯` : "Major cleared — the quiz can help!");
+  if (!silent) toast(name ? `${name.toUpperCase()} — set as your major` : "MAJOR CLEARED — the quiz can help");
 }
 
 function renderChosenMajor() {
@@ -391,7 +463,7 @@ function renderChosenMajor() {
 function initQuiz() {
   $("#quiz-questions").innerHTML = QUIZ.map((q, qi) => `
     <div class="quiz-q">
-      <h3>${qi + 1}. ${esc(q.q)}</h3>
+      <h3>${String(qi + 1).padStart(2, "0")} / ${esc(q.q)}</h3>
       <div class="quiz-opts">
         ${q.opts.map((o, oi) => `
           <label class="quiz-opt ${state.quizAnswers[qi] === oi ? "selected" : ""}">
@@ -423,7 +495,7 @@ function initQuiz() {
 function showQuizResults() {
   const answered = QUIZ.filter((_, i) => state.quizAnswers[i] != null).length;
   if (answered < QUIZ.length) {
-    toast(`Answer all ${QUIZ.length} questions first (${answered}/${QUIZ.length} done)`);
+    toast(`ANSWER ALL ${QUIZ.length} QUESTIONS FIRST — ${answered}/${QUIZ.length} done`);
     return;
   }
   const user = {};
@@ -438,12 +510,12 @@ function showQuizResults() {
     return { m, score: dot / (mag(user) * mag(m.traits) || 1) };
   }).sort((a, b) => b.score - a.score).slice(0, 3);
 
-  $("#quiz-results").innerHTML = `<h2 style="margin:6px 0 14px">Your top matches</h2>` +
+  $("#quiz-results").innerHTML = `<h2 class="results-head" style="margin:6px 0 14px;font-family:var(--font-m);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ice)">// Your top matches</h2>` +
     results.map(({ m, score }, i) => `
       <div class="match-card">
         <div class="match-head">
-          <h3>${["🥇", "🥈", "🥉"][i]} ${esc(m.name)}</h3>
-          <span class="match-pct">${Math.round(score * 100)}% match</span>
+          <h3><span class="match-rank">[ 0${i + 1} ]</span>${esc(m.name)}</h3>
+          <span class="match-pct">${Math.round(score * 100)}% MATCH</span>
         </div>
         <p>${esc(m.desc)}</p>
         <div class="chips">${m.careers.map((c) => `<span class="chip">${esc(c)}</span>`).join("")}</div>
@@ -451,10 +523,10 @@ function showQuizResults() {
         <div class="chips">${m.classes.map((c) => `<span class="chip green">${esc(c)}</span>`).join("")}</div>
         <div class="row-end" style="margin-top:12px">
           <button class="btn btn-ghost btn-small" data-plan="${m.track}">See course plan →</button>
-          <button class="btn btn-primary btn-small" data-setmajor="${esc(m.name)}">🎯 Set as my major</button>
+          <button class="btn btn-primary btn-small" data-setmajor="${esc(m.name)}">Set as my major</button>
         </div>
       </div>`).join("") +
-    `<div class="card tip-card">💡 Treat these as starting points, not verdicts. About a third of college students change majors — what matters now is picking classes and activities that keep your best doors open.</div>`;
+    `<div class="card tip-card"><strong>NOTE —</strong> Treat these as starting points, not verdicts. About a third of college students change majors — what matters now is picking classes and activities that keep your best doors open.</div>`;
 
   $$("#quiz-results [data-plan]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -499,31 +571,34 @@ function renderTrack() {
           ${Object.entries(subjects).map(([subj, cls]) => `<tr><td>${esc(subj)}</td><td>${esc(cls)}</td></tr>`).join("")}
         </table>
       </div>`).join("") +
-    `<div class="card tip-card track-tip">💡 <strong>Counselor's note:</strong> ${esc(track.tip)}</div>`;
+    `<div class="card tip-card track-tip"><strong>COUNSELOR'S NOTE —</strong> ${esc(track.tip)}</div>`;
 }
 
 // ============================================================
 // COLLEGES — admission chance model
 // ============================================================
 // Rough heuristic: start from the school's acceptance rate, scale by how the
-// student's GPA/SAT compare to typical admits, nudge for activities/leadership.
+// student's GPA/SAT compare to typical admits, nudge for activities/leadership/honors.
 function admitChance(c) {
+  if (c.acc == null) return null; // custom school without stats
   const gpa = Number(state.profile.gpa) || null;
   const sat = effectiveSAT();
   if (!gpa && !sat) return null;
 
   const factors = [];
-  if (sat) {
+  if (sat && c.sat25 && c.sat75 && c.sat75 > c.sat25) {
     const p = (sat - c.sat25) / (c.sat75 - c.sat25); // 0 = 25th pct, 1 = 75th pct
     factors.push(clamp(0.6 + p * 1.3, 0.2, 2.1));
   }
-  if (gpa) {
+  if (gpa && c.gpa) {
     factors.push(clamp(1 + (gpa - c.gpa) * 3, 0.2, 1.7));
   }
+  if (!factors.length) return null;
   let f = factors.reduce((a, b) => a + b, 0) / factors.length;
 
   const leadBoost = { none: 0.92, member: 1.0, officer: 1.08, president: 1.18 }[state.profile.leadership] || 1;
   f *= leadBoost * (1 + Math.min(state.profile.clubs.length, 5) * 0.015);
+  f *= 1 + Math.min(state.profile.honors.length, 4) * 0.02;
 
   let chance = c.acc * f;
   // ultra-selective schools are a lottery even for perfect stats
@@ -556,7 +631,7 @@ function chanceHtml(c, chance, fit) {
   return `
     <div class="chance-row" title="Rough estimate — real admissions also read essays, recs & context">
       <div class="chance-track"><div class="chance-fill cb-${fit}" style="width:${chance}%"></div></div>
-      <span class="chance-pct">~${chance}% chance</span>
+      <span class="chance-pct">~${chance}% CHANCE</span>
     </div>`;
 }
 
@@ -564,48 +639,49 @@ function renderColleges() {
   if (!$("#college-list")) return;
   const hasStats = Number(state.profile.gpa) || effectiveSAT();
   $("#fit-note").textContent = hasStats
-    ? "Chance estimates use your GPA, test score, activities & leadership vs. each school's typical admits. Real admissions read essays, recs, and context we can't see — treat these as ballpark, never guarantees."
-    : "Add your GPA or a test score in My Profile to see personalized admission chances and Reach / Match / Safety badges.";
+    ? "Chance estimates use your GPA, test score, activities, leadership & honors vs. each school's typical admits. Real admissions read essays, recs, and context we can't see — treat these as ballpark, never guarantees."
+    : "Add your GPA or a test score in MY PROFILE to see personalized admission chances and Reach / Match / Safety badges.";
 
   const q = $("#college-search").value.trim().toLowerCase();
   const fitF = $("#college-fit-filter").value;
   const typeF = $("#college-type-filter").value;
   const sort = $("#college-sort").value;
 
-  let list = COLLEGES.map((c) => {
+  let list = allColleges().map((c) => {
     const chance = admitChance(c);
     return { ...c, chance, fit: fitFromChance(c, chance) };
   });
   if (q) list = list.filter((c) =>
-    c.name.toLowerCase().includes(q) || c.state.toLowerCase().includes(q) ||
-    c.tags.some((t) => t.toLowerCase().includes(q)));
+    c.name.toLowerCase().includes(q) || (c.state || "").toLowerCase().includes(q) ||
+    (c.tags || []).some((t) => t.toLowerCase().includes(q)));
   if (fitF !== "all") list = list.filter((c) => c.fit === fitF);
   if (typeF !== "all") list = list.filter((c) => c.type === typeF);
   list.sort((a, b) =>
-    sort === "chance" ? (b.chance ?? b.acc) - (a.chance ?? a.acc) :
-    sort === "acc-desc" ? b.acc - a.acc :
-    sort === "acc-asc" ? a.acc - b.acc :
+    sort === "chance" ? (b.chance ?? b.acc ?? -1) - (a.chance ?? a.acc ?? -1) :
+    sort === "acc-desc" ? (b.acc ?? -1) - (a.acc ?? -1) :
+    sort === "acc-asc" ? (a.acc ?? 101) - (b.acc ?? 101) :
     a.name.localeCompare(b.name));
 
   const onList = new Set(state.myList.map((c) => c.name));
   $("#college-list").innerHTML = list.length ? list.map((c) => `
     <div class="college-card">
+      ${c.custom ? `<button class="cc-del" data-delcc="${esc(c.name)}" title="Delete this custom school">DEL ✕</button>` : ""}
       <div class="college-top">
         <div class="college-mono ${monoClass(c.name)}">${esc(monogram(c.name))}</div>
         <div class="college-namebox">
           <h3>${esc(c.name)}</h3>
-          <div class="college-loc">${esc(c.state)} · ${esc(c.type)}</div>
+          <div class="college-loc">${esc(c.state || "—")} · ${esc(c.type || "—")}</div>
         </div>
         <span class="fit-badge ${c.fit ? "fit-" + c.fit : "fit-none"}">${c.fit || "add stats"}</span>
       </div>
       <div class="college-stats">
-        <div><strong>${c.acc}%</strong>acceptance</div>
-        <div><strong>${c.sat25}–${c.sat75}</strong>SAT range</div>
-        <div><strong>${c.gpa.toFixed(2)}</strong>avg GPA</div>
+        <div><strong>${c.acc != null ? c.acc + "%" : "—"}</strong>acceptance</div>
+        <div><strong>${c.sat25 && c.sat75 ? c.sat25 + "–" + c.sat75 : "—"}</strong>SAT range</div>
+        <div><strong>${c.gpa ? Number(c.gpa).toFixed(2) : "—"}</strong>avg GPA</div>
       </div>
       ${chanceHtml(c, c.chance, c.fit)}
       <div class="college-foot">
-        <div class="college-tags">${c.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+        <div class="college-tags">${c.custom ? `<span class="tag custom">Custom</span>` : ""}${(c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>
         ${onList.has(c.name)
           ? `<button class="btn btn-ghost btn-small" disabled>✓ On my list</button>`
           : `<button class="btn btn-primary btn-small" data-add="${esc(c.name)}">+ Add to list</button>`}
@@ -617,7 +693,17 @@ function renderColleges() {
     btn.addEventListener("click", () => {
       state.myList.push({ name: btn.dataset.add, status: "Researching", appType: "RD", deadline: "", reqs: {} });
       save();
-      toast(`${btn.dataset.add} added to your list ✓`);
+      toast(`${btn.dataset.add.toUpperCase()} — added to your list`);
+      renderColleges();
+    });
+  });
+
+  $$("#college-list [data-delcc]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.delcc;
+      state.customColleges = state.customColleges.filter((c) => c.name !== name);
+      save();
+      toast(`${name.toUpperCase()} — deleted`);
       renderColleges();
     });
   });
@@ -626,17 +712,56 @@ function renderColleges() {
   renderMyList();
 }
 
-const STATUSES = ["Researching", "Essays in progress", "Ready to submit", "Submitted", "Accepted 🎉", "Waitlisted", "Denied"];
+// ----- add your own school -----
+function initAddSchool() {
+  $("#cc-add-btn").addEventListener("click", () => {
+    const name = $("#cc-name").value.trim();
+    if (!name) { toast("SCHOOL NAME REQUIRED"); return; }
+    if (allColleges().some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      toast("THAT SCHOOL ALREADY EXISTS in the explorer");
+      return;
+    }
+    const num = (id, lo, hi) => {
+      const v = parseFloat($(id).value);
+      return Number.isFinite(v) ? clamp(v, lo, hi) : null;
+    };
+    let sat25 = num("#cc-sat25", 400, 1600);
+    let sat75 = num("#cc-sat75", 400, 1600);
+    if (sat25 && sat75 && sat25 > sat75) [sat25, sat75] = [sat75, sat25];
+    const acc = num("#cc-acc", 1, 100);
+    const gpa = num("#cc-gpa", 0, 4);
+    const tags = $("#cc-tags").value.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 4);
+
+    state.customColleges.push({
+      name,
+      state: $("#cc-state").value.trim(),
+      type: $("#cc-type").value,
+      acc: acc ?? undefined,
+      sat25: sat25 ?? undefined,
+      sat75: sat75 ?? undefined,
+      gpa: gpa ?? undefined,
+      tags,
+      custom: true,
+    });
+    save();
+    ["#cc-name", "#cc-state", "#cc-acc", "#cc-sat25", "#cc-sat75", "#cc-gpa", "#cc-tags"]
+      .forEach((id) => { $(id).value = ""; });
+    toast(`${name.toUpperCase()} — added${acc ? " with chance estimate" : " (add stats later for a chance estimate)"}`);
+    renderColleges();
+  });
+}
+
+const STATUSES = ["Researching", "Essays in progress", "Ready to submit", "Submitted", "Accepted", "Waitlisted", "Denied"];
 const APP_TYPES = ["ED", "EA", "REA", "RD", "Rolling"];
 
 function renderMyList() {
   if (!state.myList.length) {
     $("#list-balance").innerHTML = "";
-    $("#mylist-body").innerHTML = `<p class="empty-note">Your list is empty. Head to <strong>Explore colleges</strong> and add schools — then track statuses and deadlines here.<br><br>A balanced list: 2–3 safeties · 3–4 matches · 2–3 reaches.</p>`;
+    $("#mylist-body").innerHTML = `<p class="empty-note">Your list is empty. Head to EXPLORE COLLEGES and add schools — then track statuses and deadlines here.<br><br>A balanced list: 2–3 safeties · 3–4 matches · 2–3 reaches.</p>`;
     return;
   }
 
-  const byName = Object.fromEntries(COLLEGES.map((c) => [c.name, c]));
+  const byName = Object.fromEntries(allColleges().map((c) => [c.name, c]));
   const info = (name) => {
     const c = byName[name];
     if (!c) return { chance: null, fit: null };
@@ -650,18 +775,18 @@ function renderMyList() {
   const rated = counts.Reach + counts.Match + counts.Safety;
   let advice = "";
   if (rated) {
-    if (!counts.Safety) advice = "⚠️ No safeties yet — add 1–2 schools you'd be happy at with great odds.";
-    else if (!counts.Match) advice = "⚠️ Add a few match schools — they're where most students end up.";
+    if (!counts.Safety) advice = "No safeties yet — add 1–2 schools you'd be happy at with great odds.";
+    else if (!counts.Match) advice = "Add a few match schools — they're where most students end up.";
     else if (!counts.Reach) advice = "You've got room to dream — consider adding a reach or two.";
-    else advice = "✨ Nice balance!";
+    else advice = "Nice balance.";
   }
   $("#list-balance").innerHTML = rated ? `
     <div class="balance-bar">
-      <span>⚖️ List balance:</span>
+      <span>LIST BALANCE //</span>
       <span class="fit-badge fit-Reach">${counts.Reach} Reach</span>
       <span class="fit-badge fit-Match">${counts.Match} Match</span>
       <span class="fit-badge fit-Safety">${counts.Safety} Safety</span>
-      <span style="font-weight:600;color:var(--ink-soft)">${advice}</span>
+      <span class="balance-note">${advice}</span>
     </div>` : "";
 
   $("#mylist-body").innerHTML = state.myList.map((c, i) => {
@@ -673,7 +798,7 @@ function renderMyList() {
       <div class="mylist-head">
         <h3>${esc(c.name)}
           ${fit ? `<span class="fit-badge fit-${fit}">${fit}</span>` : ""}
-          ${chance != null ? `<span class="mylist-chance">~${chance}% chance</span>` : ""}
+          ${chance != null ? `<span class="mylist-chance">~${chance}% CHANCE</span>` : ""}
         </h3>
         <button class="remove-btn" data-rm="${i}">Remove</button>
       </div>
@@ -693,7 +818,7 @@ function renderMyList() {
         </label>
       </div>
       <details class="req-details" ${done > 0 && done < REQUIREMENTS.length ? "open" : ""}>
-        <summary>📋 Application requirements
+        <summary>Application requirements
           <span class="req-sum-bar"><span class="req-sum-fill" style="width:${(done / REQUIREMENTS.length) * 100}%"></span></span>
           <span class="req-count">${done}/${REQUIREMENTS.length}</span>
         </summary>
@@ -717,12 +842,12 @@ function renderMyList() {
     const done = REQUIREMENTS.filter(([k]) => item.reqs[k]).length;
     det.querySelector(".req-count").textContent = `${done}/${REQUIREMENTS.length}`;
     det.querySelector(".req-sum-fill").style.width = (done / REQUIREMENTS.length) * 100 + "%";
-    if (done === REQUIREMENTS.length) toast(`${item.name}: all requirements done! 🎉`);
+    if (done === REQUIREMENTS.length) toast(`${item.name.toUpperCase()} — ALL REQUIREMENTS DONE`);
   }));
 
   $$("#mylist-body [data-rm]").forEach((b) => b.addEventListener("click", () => {
     const removed = state.myList.splice(Number(b.dataset.rm), 1)[0];
-    save(); toast(`${removed.name} removed`); renderColleges();
+    save(); toast(`${removed.name.toUpperCase()} — removed`); renderColleges();
   }));
   $$("#mylist-body [data-status]").forEach((s) => s.addEventListener("change", () => {
     state.myList[Number(s.dataset.status)].status = s.value; save();
@@ -746,6 +871,7 @@ function initColleges() {
         v.classList.toggle("active", v.id === "subview-" + tab.dataset.subtab));
     });
   });
+  initAddSchool();
 }
 
 // ============================================================
@@ -759,7 +885,7 @@ function initEssay() {
   $("#essay-prompts").innerHTML = ESSAY_PROMPTS.map((p, i) => `
     <label class="prompt-opt ${state.essay.prompt === i ? "selected" : ""}">
       <input type="radio" name="prompt" value="${i}" ${state.essay.prompt === i ? "checked" : ""}>
-      <span><strong>Prompt ${i + 1}.</strong> ${esc(p)}</span>
+      <span><strong>PROMPT ${String(i + 1).padStart(2, "0")}</strong><br>${esc(p)}</span>
     </label>`).join("");
 
   $$("#essay-prompts input").forEach((r) => r.addEventListener("change", () => {
@@ -787,7 +913,7 @@ function initEssay() {
 function updateWordcount() {
   const n = countWords($("#essay-draft").value);
   const el = $("#essay-wordcount");
-  el.textContent = `${n} / 650 words`;
+  el.textContent = `${n} / 650 WORDS`;
   el.className = "wordcount " + (n > 650 ? "over" : n >= 450 ? "good" : "");
 }
 
@@ -795,41 +921,41 @@ function giveEssayFeedback() {
   const text = $("#essay-draft").value;
   const n = countWords(text);
   const items = [];
-  const add = (kind, icon, msg) => items.push({ kind, icon, msg });
+  const add = (kind, tag, msg) => items.push({ kind, tag, msg });
 
-  if (n === 0) { add("warn", "📝", "Nothing here yet! Start with one honest paragraph about a specific moment — you can shape it later."); }
-  else if (n < 150) add("warn", "📝", `${n} words so far — keep going. Don't edit yet; get the whole story down first.`);
-  else if (n <= 650) add("good", "✅", `${n} words — inside the 650 limit. ${n < 500 ? "You have room to add detail if you need it." : "Great length."}`);
-  else add("bad", "✂️", `${n} words — that's ${n - 650} over the Common App limit. Cut ruthlessly: your weakest paragraph, not your favorite one.`);
+  if (n === 0) { add("warn", "START", "Nothing here yet! Start with one honest paragraph about a specific moment — you can shape it later."); }
+  else if (n < 150) add("warn", "DRAFT", `${n} words so far — keep going. Don't edit yet; get the whole story down first.`);
+  else if (n <= 650) add("good", "OK", `${n} words — inside the 650 limit. ${n < 500 ? "You have room to add detail if you need it." : "Great length."}`);
+  else add("bad", "CUT", `${n} words — that's ${n - 650} over the Common App limit. Cut ruthlessly: your weakest paragraph, not your favorite one.`);
 
   const found = CLICHE_TOPICS.filter((c) => c.pattern.test(text));
-  found.forEach((c) => add("warn", "⚠️", c.label));
-  if (n > 150 && !found.length) add("good", "✅", "No classic essay clichés detected — good sign.");
+  found.forEach((c) => add("warn", "CLICHÉ", c.label));
+  if (n > 150 && !found.length) add("good", "OK", "No classic essay clichés detected — good sign.");
 
   if (n > 0) {
     const weak = WEAK_WORDS
       .map((w) => ({ w, count: (text.toLowerCase().match(new RegExp(`\\b${w.replace(" ", "\\s+")}\\b`, "g")) || []).length }))
       .filter((x) => x.count > 0);
     const total = weak.reduce((s, x) => s + x.count, 0);
-    if (total >= 3) add("warn", "🔍", `Vague words to replace with specifics: ${weak.map((x) => `"${x.w}" ×${x.count}`).join(", ")}. "Amazing" tells; a detail shows.`);
+    if (total >= 3) add("warn", "VAGUE", `Vague words to replace with specifics: ${weak.map((x) => `"${x.w}" ×${x.count}`).join(", ")}. "Amazing" tells; a detail shows.`);
   }
 
   if (n > 200) {
     const paras = text.split(/\n\s*\n/).filter((p) => p.trim());
-    if (paras.length === 1) add("warn", "📐", "One giant paragraph — break it into 4–6. White space is your friend; readers skim.");
+    if (paras.length === 1) add("warn", "SHAPE", "One giant paragraph — break it into 4–6. White space is your friend; readers skim.");
     const iCount = (text.match(/\bI\b/g) || []).length;
-    if (iCount < n / 100) add("warn", "🪞", "This reads as more about the topic than about YOU. The essay's real subject is always you — your choices, changes, and voice.");
+    if (iCount < n / 100) add("warn", "VOICE", "This reads as more about the topic than about YOU. The essay's real subject is always you — your choices, changes, and voice.");
     const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 2);
     const avgLen = n / Math.max(sentences.length, 1);
-    if (avgLen > 28) add("warn", "✏️", `Average sentence length is ~${Math.round(avgLen)} words — long. Mix in short sentences. They hit harder.`);
+    if (avgLen > 28) add("warn", "STYLE", `Average sentence length is ~${Math.round(avgLen)} words — long. Mix in short sentences. They hit harder.`);
   }
 
   if (n > 400 && items.every((i) => i.kind === "good")) {
-    add("good", "🌟", "Strong shape! Next step: read it out loud (you'll catch clunky lines instantly), then ask one adult and one friend: \"Does this sound like me?\"");
+    add("good", "STRONG", "Strong shape! Next step: read it out loud (you'll catch clunky lines instantly), then ask one adult and one friend: \"Does this sound like me?\"");
   }
 
   $("#essay-feedback").innerHTML = items
-    .map((i) => `<div class="feedback-item ${i.kind}"><span>${i.icon}</span><span>${esc(i.msg)}</span></div>`).join("");
+    .map((i) => `<div class="feedback-item ${i.kind}"><span class="fb-tag">${i.tag}</span><span>${esc(i.msg)}</span></div>`).join("");
 }
 
 // ============================================================
@@ -860,10 +986,12 @@ function fillOppCategories() {
 }
 
 function renderOpps() {
+  if (!$("#opp-list")) return;
   const q = $("#opp-search").value.trim().toLowerCase();
   const cat = $("#opp-cat-filter").value;
   const cost = $("#opp-cost-filter").value;
   const isPrograms = oppTab === "programs";
+  const kind = isPrograms ? "program" : "scholarship";
   let items = isPrograms ? PROGRAMS : SCHOLARSHIPS;
 
   if (q) items = items.filter((i) => (i.name + " " + i.desc + " " + (i.who || "") + " " + (i.grades || "")).toLowerCase().includes(q));
@@ -882,15 +1010,21 @@ function renderOpps() {
         ${isPrograms
           ? `<span class="chip green">${esc(i.cost)}</span><span class="chip">${esc(i.sel)}</span>`
           : `<span class="chip green">${esc(i.amount)}</span>`}
+        <button class="btn ${isOppSaved(i.name) ? "btn-ghost" : "btn-primary"} btn-small opp-save" data-saveopp="${esc(i.name)}">
+          ${isOppSaved(i.name) ? "✓ Saved" : "+ Save"}
+        </button>
       </div>
     </div>`).join("")
     : `<p class="empty-note">Nothing matches those filters.</p>`;
+
+  $$("#opp-list [data-saveopp]").forEach((btn) => {
+    btn.addEventListener("click", () => toggleSavedOpp(btn.dataset.saveopp, kind));
+  });
 }
 
 // ============================================================
 // boot
 // ============================================================
-applyTheme();
 initProfile();
 initMajors();
 initQuiz();
@@ -900,3 +1034,4 @@ initEssay();
 initOpps();
 renderDashboard();
 renderColleges();
+if (window.fxReveal) fxReveal(document.querySelector(".view.active"));
