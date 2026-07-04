@@ -1,6 +1,7 @@
 /* ============================================================
-   AD—ASTRA — igloo.inc-inspired interactivity
-   One continuous particle scene morphing between chapters.
+   AD—ASTRA — cinematic interactivity (igloo.inc-inspired)
+   Inertial scroll · scroll-velocity star warp · per-chapter
+   object framing · line-mask reveals · parallax
    ============================================================ */
 "use strict";
 
@@ -47,7 +48,22 @@ if (!location.hash) window.scrollTo(0, 0);
 })();
 
 /* ------------------------------------------------------------
-   Particle scene — one object morphing between chapter shapes
+   Line-mask heading reveals (skip under reduced motion)
+   ------------------------------------------------------------ */
+(() => {
+  if (reducedMotion) return;
+  document.querySelectorAll("h1, .sec-head h2, .bridge-line, .footer-big").forEach((el) => {
+    const parts = el.innerHTML.split(/<br\s*\/?>/i);
+    el.innerHTML = parts
+      .map((p) => `<span class="line"><span class="line-in">${p}</span></span>`)
+      .join("");
+    el.classList.add("masked");
+  });
+})();
+
+/* ------------------------------------------------------------
+   Particle scene — one object morphing between chapter shapes.
+   Tracks scroll itself: star parallax + velocity warp streaks.
    ------------------------------------------------------------ */
 const Scene = (() => {
   const canvas = document.getElementById("scene");
@@ -57,15 +73,18 @@ const Scene = (() => {
   const tgt = new Float32Array(N * 3);
   let stars = [];
   let w = 0, h = 0, dpr = 1;
-  let mx = 0, my = 0;              // mouse -1..1
-  let tint = [159, 212, 255];      // ice
+  let mx = 0, my = 0;
+  let tint = [159, 212, 255];
   let tintTgt = [159, 212, 255];
   let time = 0;
+  // scroll state (internally smoothed)
+  let sSmooth = 0;
+  // object framing (per chapter): x offset in [-1,1], scale multiplier
+  let ax = 0, axTgt = 0, as = 1.12, asTgt = 1.12;
 
   const rnd = Math.random;
   const TAU = Math.PI * 2;
 
-  /* ---- shape generators (unit space, radius ~1) ---- */
   function set(arr, i, x, y, z) { arr[i * 3] = x; arr[i * 3 + 1] = y; arr[i * 3 + 2] = z; }
 
   const shapes = {
@@ -87,7 +106,7 @@ const Scene = (() => {
     },
     atom(out) {
       for (let i = 0; i < N; i++) {
-        if (i < N * 0.14) { // nucleus
+        if (i < N * 0.14) {
           set(out, i, (rnd() - 0.5) * 0.22, (rnd() - 0.5) * 0.22, (rnd() - 0.5) * 0.22);
         } else {
           const ring = i % 3;
@@ -105,7 +124,7 @@ const Scene = (() => {
           const r = 0.55 * Math.cbrt(rnd());
           const th = rnd() * TAU, ph = Math.acos(2 * rnd() - 1);
           set(out, i, r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th));
-        } else { // corona rays
+        } else {
           const r = 0.6 + rnd() * 0.65;
           const th = rnd() * TAU, ph = Math.acos(2 * rnd() - 1);
           set(out, i, r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th));
@@ -113,7 +132,7 @@ const Scene = (() => {
       }
     },
     torus(out) {
-      const tilt = 1.13; // ~65°
+      const tilt = 1.13;
       const ct = Math.cos(tilt), st = Math.sin(tilt);
       for (let i = 0; i < N; i++) {
         if (i < N * 0.07) { set(out, i, (rnd() - 0.5) * 0.1, (rnd() - 0.5) * 0.1, (rnd() - 0.5) * 0.1); continue; }
@@ -151,19 +170,18 @@ const Scene = (() => {
       }
     },
     rocket(out) {
-      // surface of revolution: nose cone → body → skirt → nozzle + plume
       for (let i = 0; i < N; i++) {
         const u = rnd();
         let y, r;
         if (u < 0.78) {
           const t = rnd();
-          if (t < 0.3) { const k = t / 0.3; y = -1.05 + k * 0.6; r = 0.22 * k; }               // cone
-          else if (t < 0.78) { const k = (t - 0.3) / 0.48; y = -0.45 + k * 0.95; r = 0.22; }  // body
-          else if (t < 0.88) { const k = (t - 0.78) / 0.1; y = 0.5 + k * 0.12; r = 0.22 + k * 0.05; } // skirt
-          else { const k = (t - 0.88) / 0.12; y = 0.62 + k * 0.23; r = 0.27 - k * 0.13 + k * k * 0.16; } // nozzle
+          if (t < 0.3) { const k = t / 0.3; y = -1.05 + k * 0.6; r = 0.22 * k; }
+          else if (t < 0.78) { const k = (t - 0.3) / 0.48; y = -0.45 + k * 0.95; r = 0.22; }
+          else if (t < 0.88) { const k = (t - 0.78) / 0.1; y = 0.5 + k * 0.12; r = 0.22 + k * 0.05; }
+          else { const k = (t - 0.88) / 0.12; y = 0.62 + k * 0.23; r = 0.27 - k * 0.13 + k * k * 0.16; }
           const a = rnd() * TAU;
           set(out, i, Math.cos(a) * r, y, Math.sin(a) * r);
-        } else { // exhaust plume
+        } else {
           const k = rnd();
           y = 0.9 + k * 0.65;
           r = 0.05 + k * 0.3 * rnd();
@@ -173,7 +191,6 @@ const Scene = (() => {
       }
     },
     curve(out) {
-      // Δv = ve·ln(R) — a rising log curve, plotted as a band
       for (let i = 0; i < N; i++) {
         const x = rnd() * 2.6 - 1.3;
         const y = -(Math.log(1 + (x + 1.3) * 2.4) / Math.log(7.3)) * 1.5 + 0.75;
@@ -219,24 +236,41 @@ const Scene = (() => {
   function setShape(name, tintName) {
     (shapes[name] || shapes.sphere)(tgt);
     tintTgt = TINTS[tintName] || TINTS.ice;
-    if (reducedMotion) { cur.set(tgt); tint = tintTgt.slice(); draw(); }
+    if (reducedMotion) { cur.set(tgt); tint = tintTgt.slice(); draw(0); }
+  }
+  function setFraming(x, scale) {
+    axTgt = x; asTgt = scale;
+    if (reducedMotion) { ax = x; as = scale; }
   }
   shapes.sphere(tgt); cur.set(tgt);
 
-  function draw() {
+  function draw(vel) {
     ctx.clearRect(0, 0, w, h);
 
-    // static stars
+    // stars: parallax drift with scroll + warp streaks with velocity
+    const warp = Math.min(Math.abs(vel) * 0.28, 110);
     for (const s of stars) {
-      const a = reducedMotion ? s.a : s.a * (0.6 + 0.4 * Math.sin(s.tw + time * 1.4));
-      ctx.fillStyle = `rgba(200,225,250,${a.toFixed(3)})`;
-      ctx.fillRect(s.x, s.y, s.r, s.r);
+      const depth = s.a * 1.6; // brightness doubles as depth
+      const sy = ((s.y - sSmooth * 0.07 * depth) % h + h) % h;
+      const alpha = reducedMotion ? s.a : s.a * (0.6 + 0.4 * Math.sin(s.tw + time * 1.4));
+      const len = warp * depth;
+      if (len > 3) {
+        ctx.fillStyle = `rgba(200,225,250,${(alpha * 0.6).toFixed(3)})`;
+        ctx.fillRect(s.x, vel > 0 ? sy : sy - len, s.r * 0.8, len + s.r);
+      } else {
+        ctx.fillStyle = `rgba(200,225,250,${alpha.toFixed(3)})`;
+        ctx.fillRect(s.x, sy, s.r, s.r);
+      }
     }
 
-    // particle object
-    const R = Math.min(w, h) * 0.36;
-    const cx = w / 2, cy = h * 0.52;
-    const ry = time * 0.14 + mx * 0.45;
+    // object framing eases toward chapter anchor
+    ax += (axTgt - ax) * 0.045;
+    as += (asTgt - as) * 0.045;
+    const narrow = w < 900;
+    const R = Math.min(w, h) * 0.36 * (narrow ? 1 : as);
+    const cx = w / 2 + (narrow ? 0 : ax * w * 0.26);
+    const cy = h * 0.52;
+    const ry = time * 0.14 + mx * 0.45 + vel * 0.0012;
     const rx = -0.16 + my * 0.28;
     const cyr = Math.cos(ry), syr = Math.sin(ry);
     const cxr = Math.cos(rx), sxr = Math.sin(rx);
@@ -244,16 +278,13 @@ const Scene = (() => {
     ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < N; i++) {
       const ix = i * 3;
-      // morph
       cur[ix] += (tgt[ix] - cur[ix]) * 0.055;
       cur[ix + 1] += (tgt[ix + 1] - cur[ix + 1]) * 0.055;
       cur[ix + 2] += (tgt[ix + 2] - cur[ix + 2]) * 0.055;
-      // rotate Y then X
       let x = cur[ix] * cyr + cur[ix + 2] * syr;
       let z = -cur[ix] * syr + cur[ix + 2] * cyr;
       let y = cur[ix + 1] * cxr - z * sxr;
       z = cur[ix + 1] * sxr + z * cxr;
-      // project
       const persp = 2.9 / (2.9 + z);
       const sx = cx + x * R * persp;
       const sy = cy + y * R * persp;
@@ -265,13 +296,15 @@ const Scene = (() => {
     }
     ctx.globalCompositeOperation = "source-over";
 
-    // tint easing
     for (let c = 0; c < 3; c++) tint[c] += (tintTgt[c] - tint[c]) * 0.04;
   }
 
   function loop() {
     time += 0.016;
-    draw();
+    const target = window.scrollY;
+    const vel = (target - sSmooth) * 0.5; // lag distance ≈ velocity proxy
+    sSmooth += (target - sSmooth) * 0.09;
+    draw(vel);
     requestAnimationFrame(loop);
   }
 
@@ -283,14 +316,116 @@ const Scene = (() => {
     }, { passive: true });
   }
   resize();
-  if (reducedMotion) draw();
+  if (reducedMotion) draw(0);
   else requestAnimationFrame(loop);
 
-  return { setShape };
+  return { setShape, setFraming };
 })();
 
 /* ------------------------------------------------------------
-   Chapters: HUD readout, particle shape, rail, nav state
+   Motion — inertial smooth scroll + choreography.
+   Content rides a fixed <main> translated by an eased scroll
+   value; a spacer div keeps the native scrollbar honest.
+   ------------------------------------------------------------ */
+const Motion = (() => {
+  const enabled = !reducedMotion && finePointer && window.innerWidth > 900;
+  const main = document.querySelector("main");
+  const hero = document.querySelector(".hero");
+  let smooth = window.scrollY;
+  let offsets = new Map(); // element -> document Y
+
+  function offsetOf(el) {
+    let y = 0, n = el;
+    while (n && n !== main) { y += n.offsetTop; n = n.offsetParent; }
+    return y;
+  }
+
+  // parallax accents: selector -> speed
+  const PRLX = [
+    [".scale-visual", 0.09],
+    [".rocket-svg", 0.10],
+    [".anatomy-svg", 0.07],
+    [".donut-wrap", 0.07],
+    ["#orbitCanvas", 0.05],
+  ];
+  let prlxItems = [];
+
+  function refresh() {
+    if (!enabled) return;
+    spacer.style.height = main.offsetHeight + "px";
+    offsets = new Map();
+    document.querySelectorAll("[id], .bridge, .footer").forEach((el) => offsets.set(el, offsetOf(el)));
+    prlxItems = PRLX.map(([sel, speed]) => {
+      const el = document.querySelector(sel);
+      return el ? { el, speed, top: offsetOf(el), h: el.offsetHeight } : null;
+    }).filter(Boolean);
+  }
+
+  function scrollToEl(el) {
+    if (!el) return;
+    if (!enabled) { el.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }); return; }
+    // compute fresh — cached offsets can go stale while fonts/layout settle
+    window.scrollTo(0, offsetOf(el));
+  }
+
+  let spacer;
+  if (enabled) {
+    document.documentElement.classList.add("smooth");
+    document.body.classList.add("smooth");
+    spacer = document.createElement("div");
+    spacer.id = "scroll-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    document.body.appendChild(spacer);
+    refresh();
+    new ResizeObserver(refresh).observe(main);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
+
+    // intercept in-page anchors (fixed main breaks native anchor math)
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      e.preventDefault();
+      const hash = a.getAttribute("href");
+      if (hash === "#top") { window.scrollTo(0, 0); return; }
+      const el = document.querySelector(hash);
+      if (!el) return;
+      scrollToEl(el);
+      if (a.classList.contains("skip-link")) {
+        el.setAttribute("tabindex", "-1");
+        el.focus({ preventScroll: true });
+      }
+    });
+
+    const vh = () => window.innerHeight;
+    (function frame() {
+      smooth += (window.scrollY - smooth) * 0.085;
+      if (Math.abs(window.scrollY - smooth) < 0.05) smooth = window.scrollY;
+      main.style.transform = `translate3d(0, ${(-smooth).toFixed(2)}px, 0)`;
+
+      // hero exit: lags behind, fades and shrinks as you leave
+      if (smooth < vh() * 1.2) {
+        const p = Math.min(Math.max(smooth / (vh() * 0.7), 0), 1);
+        hero.style.opacity = String(1 - p * 0.92);
+        hero.style.transform = `translate3d(0, ${(smooth * 0.18).toFixed(1)}px, 0) scale(${(1 - p * 0.05).toFixed(4)})`;
+      }
+
+      // parallax accents drift slower than the page
+      const center = smooth + vh() * 0.5;
+      for (const it of prlxItems) {
+        const d = (it.top + it.h * 0.5) - center;
+        if (Math.abs(d) < vh() * 1.4) {
+          it.el.style.transform = `translate3d(0, ${(d * it.speed).toFixed(1)}px, 0)`;
+        }
+      }
+      requestAnimationFrame(frame);
+    })();
+  }
+
+  return { enabled, scrollToEl };
+})();
+
+/* ------------------------------------------------------------
+   Chapters: HUD readout, particle shape + framing, rail, nav
    ------------------------------------------------------------ */
 (() => {
   const chapters = [...document.querySelectorAll("[data-chapter]")];
@@ -298,12 +433,20 @@ const Scene = (() => {
   const rail = document.getElementById("chapterRail");
   const navLinks = [...document.querySelectorAll(".hud-links a")];
 
-  // build rail dots
+  // per-chapter object framing: x in [-1,1], scale multiplier
+  const FRAMING = {
+    hero: [0, 1.12], scale: [0.65, 0.8], concepts: [-0.65, 0.8], stars: [0.65, 0.85],
+    blackholes: [0.7, 0.7], light: [-0.65, 0.75], bigbang: [0.65, 0.85], bridge: [0, 1.1],
+    rockets: [0.65, 0.8], anatomy: [-0.7, 0.7], equation: [0.7, 0.7], engines: [-0.65, 0.75],
+    orbit: [0.7, 0.7], footer: [0, 1.1],
+  };
+  const frameKey = (sec) => sec.id || (sec.classList.contains("bridge") ? "bridge" : sec.classList.contains("footer") ? "footer" : "hero");
+
   const dots = chapters.map((sec, i) => {
     const b = document.createElement("button");
     b.className = "rail-dot";
     b.setAttribute("aria-label", sec.dataset.chapter);
-    b.addEventListener("click", () => sec.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }));
+    b.addEventListener("click", () => Motion.scrollToEl(sec));
     rail.appendChild(b);
     return b;
   });
@@ -315,6 +458,8 @@ const Scene = (() => {
       const idx = chapters.indexOf(sec);
       hudChapter.textContent = sec.dataset.chapter;
       Scene.setShape(sec.dataset.shape, sec.dataset.tint);
+      const [fx, fs] = FRAMING[frameKey(sec)] || [0, 1];
+      Scene.setFraming(fx, fs);
       dots.forEach((d, i) => d.classList.toggle("active", i === idx));
       if (sec.id) {
         navLinks.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + sec.id));

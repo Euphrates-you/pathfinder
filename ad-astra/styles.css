@@ -220,6 +220,25 @@ h3 {
   100% { transform: scaleY(0); transform-origin: bottom; }
 }
 
+/* ---------- cinematic scroll (desktop, fine pointer) ---------- */
+html.smooth { scroll-behavior: auto; }
+body.smooth main {
+  position: fixed; top: 0; left: 0; width: 100%;
+  will-change: transform;
+}
+#scroll-spacer { width: 1px; pointer-events: none; }
+
+/* line-mask heading reveals */
+.masked .line { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.masked .line-in {
+  display: block; transform: translateY(118%);
+  transition: transform 1.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.masked .line:nth-child(2) .line-in { transition-delay: 0.1s; }
+.masked .line:nth-child(3) .line-in { transition-delay: 0.2s; }
+.masked.visible .line-in { transform: none; }
+.reveal.masked { opacity: 1; transform: none; transition: none; }
+
 /* ---------- reveal ---------- */
 .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1); }
 .reveal.visible { opacity: 1; transform: none; }
