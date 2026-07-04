@@ -220,13 +220,54 @@ h3 {
   100% { transform: scaleY(0); transform-origin: bottom; }
 }
 
-/* ---------- cinematic scroll (desktop, fine pointer) ---------- */
-html.smooth { scroll-behavior: auto; }
-body.smooth main {
-  position: fixed; top: 0; left: 0; width: 100%;
-  will-change: transform;
+/* ---------- chapter deck (desktop, fine pointer) ----------
+   The page does not scroll. Chapters are fullscreen scenes;
+   wheel/keys fly the camera between them. */
+body.deck { overflow: hidden; height: 100dvh; }
+body.deck main { position: fixed; inset: 0; overflow: hidden; }
+body.deck .scene {
+  position: absolute; inset: 0; z-index: 3;
+  max-width: none; margin: 0; padding: 0 !important; min-height: 0;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateY(7vh) scale(0.965);
+  filter: blur(7px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.8s;
+  will-change: transform, opacity, filter;
 }
-#scroll-spacer { width: 1px; pointer-events: none; }
+body.deck .scene.above { transform: translateY(-7vh) scale(1.035); }
+body.deck .scene.active {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: none; filter: none;
+  transition-delay: 0.06s, 0.06s, 0.06s, 0s;
+}
+body.deck .scene-inner {
+  height: 100%; overflow: hidden;
+  max-width: var(--maxw); margin: 0 auto;
+  padding: 13vh var(--pad) 9vh;
+}
+body.deck .hero .scene-inner,
+body.deck .bridge .scene-inner,
+body.deck .footer .scene-inner {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  text-align: center;
+}
+body.deck .scene.has-more::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 120px;
+  background: linear-gradient(180deg, transparent, rgba(4, 7, 12, 0.9));
+  pointer-events: none;
+}
+body.deck .scene.has-more .scene-more {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.34em;
+  color: var(--ice-dim); pointer-events: none; z-index: 4;
+}
+.scene-more { display: none; }
+body.deck .scene.has-more .scene-more { display: block; animation: moreNudge 1.8s ease-in-out infinite; }
+@keyframes moreNudge { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 5px); } }
 
 /* line-mask heading reveals */
 .masked .line { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }

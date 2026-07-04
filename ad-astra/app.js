@@ -1,14 +1,15 @@
 /* ============================================================
-   AD—ASTRA — cinematic interactivity (igloo.inc-inspired)
-   Inertial scroll · scroll-velocity star warp · per-chapter
-   object framing · line-mask reveals · parallax
+   AD—ASTRA — chapter deck (igloo.inc-style)
+   The page does not scroll. Fullscreen scenes; the wheel flies
+   the camera between chapters. Stars warp on every jump.
+   Touch & reduced-motion fall back to classic document scroll.
    ============================================================ */
 "use strict";
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = window.matchMedia("(pointer: fine)").matches;
+const deckMode = finePointer && !reducedMotion && window.innerWidth > 900;
 
-// the experience begins at the top, behind the preloader — always
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 if (!location.hash) window.scrollTo(0, 0);
 
@@ -25,6 +26,7 @@ if (!location.hash) window.scrollTo(0, 0);
     if (!pre.classList.contains("done")) {
       pre.classList.add("done");
       document.body.classList.remove("preloading");
+      document.dispatchEvent(new Event("preloaded"));
     }
   }
   if (reducedMotion) {
@@ -48,7 +50,7 @@ if (!location.hash) window.scrollTo(0, 0);
 })();
 
 /* ------------------------------------------------------------
-   Line-mask heading reveals (skip under reduced motion)
+   Line-mask heading reveals
    ------------------------------------------------------------ */
 (() => {
   if (reducedMotion) return;
@@ -62,8 +64,7 @@ if (!location.hash) window.scrollTo(0, 0);
 })();
 
 /* ------------------------------------------------------------
-   Particle scene — one object morphing between chapter shapes.
-   Tracks scroll itself: star parallax + velocity warp streaks.
+   Particle scene — morphing object + star warp on travel
    ------------------------------------------------------------ */
 const Scene = (() => {
   const canvas = document.getElementById("scene");
@@ -77,9 +78,7 @@ const Scene = (() => {
   let tint = [159, 212, 255];
   let tintTgt = [159, 212, 255];
   let time = 0;
-  // scroll state (internally smoothed)
-  let sSmooth = 0;
-  // object framing (per chapter): x offset in [-1,1], scale multiplier
+  let sTarget = 0, sSmooth = 0, warpImpulse = 0;
   let ax = 0, axTgt = 0, as = 1.12, asTgt = 1.12;
 
   const rnd = Math.random;
@@ -242,15 +241,19 @@ const Scene = (() => {
     axTgt = x; asTgt = scale;
     if (reducedMotion) { ax = x; as = scale; }
   }
+  // camera jump between chapters: stars stream + warp punch
+  function travel(dir) {
+    sTarget += dir * h * 1.35;
+    warpImpulse += dir * 220;
+  }
   shapes.sphere(tgt); cur.set(tgt);
 
   function draw(vel) {
     ctx.clearRect(0, 0, w, h);
 
-    // stars: parallax drift with scroll + warp streaks with velocity
-    const warp = Math.min(Math.abs(vel) * 0.28, 110);
+    const warp = Math.min(Math.abs(vel) * 0.28, 120);
     for (const s of stars) {
-      const depth = s.a * 1.6; // brightness doubles as depth
+      const depth = s.a * 1.6;
       const sy = ((s.y - sSmooth * 0.07 * depth) % h + h) % h;
       const alpha = reducedMotion ? s.a : s.a * (0.6 + 0.4 * Math.sin(s.tw + time * 1.4));
       const len = warp * depth;
@@ -263,7 +266,6 @@ const Scene = (() => {
       }
     }
 
-    // object framing eases toward chapter anchor
     ax += (axTgt - ax) * 0.045;
     as += (asTgt - as) * 0.045;
     const narrow = w < 900;
@@ -301,9 +303,10 @@ const Scene = (() => {
 
   function loop() {
     time += 0.016;
-    const target = window.scrollY;
-    const vel = (target - sSmooth) * 0.5; // lag distance ≈ velocity proxy
-    sSmooth += (target - sSmooth) * 0.09;
+    if (!deckMode) sTarget = window.scrollY;
+    warpImpulse *= 0.9;
+    const vel = (sTarget - sSmooth) * 0.5 + warpImpulse;
+    sSmooth += (sTarget - sSmooth) * 0.09;
     draw(vel);
     requestAnimationFrame(loop);
   }
@@ -319,134 +322,206 @@ const Scene = (() => {
   if (reducedMotion) draw(0);
   else requestAnimationFrame(loop);
 
-  return { setShape, setFraming };
+  return { setShape, setFraming, travel };
 })();
 
 /* ------------------------------------------------------------
-   Motion — inertial smooth scroll + choreography.
-   Content rides a fixed <main> translated by an eased scroll
-   value; a spacer div keeps the native scrollbar honest.
+   Shared chapter data
    ------------------------------------------------------------ */
-const Motion = (() => {
-  const enabled = !reducedMotion && finePointer && window.innerWidth > 900;
-  const main = document.querySelector("main");
-  const hero = document.querySelector(".hero");
-  let smooth = window.scrollY;
-  let offsets = new Map(); // element -> document Y
+const FRAMING = {
+  hero: [0, 1.12], scale: [0.65, 0.8], concepts: [-0.65, 0.8], stars: [0.65, 0.85],
+  blackholes: [0.7, 0.7], light: [-0.65, 0.75], bigbang: [0.65, 0.85], bridge: [0, 1.1],
+  rockets: [0.65, 0.8], anatomy: [-0.7, 0.7], equation: [0.7, 0.7], engines: [-0.65, 0.75],
+  orbit: [0.7, 0.7], footer: [0, 1.1],
+};
+const frameKey = (sec) => sec.id || (sec.classList.contains("bridge") ? "bridge" : sec.classList.contains("footer") ? "footer" : "hero");
 
-  function offsetOf(el) {
-    let y = 0, n = el;
-    while (n && n !== main) { y += n.offsetTop; n = n.offsetParent; }
-    return y;
+/* ------------------------------------------------------------
+   Deck — fullscreen chapter navigation (desktop)
+   ------------------------------------------------------------ */
+const Deck = (() => {
+  if (!deckMode) return { active: false };
+
+  document.body.classList.add("deck");
+  const els = [...document.querySelectorAll("[data-chapter]")];
+  const hudChapter = document.getElementById("hudChapter");
+  const hudScroll = document.getElementById("hudScroll");
+  const fill = document.getElementById("progressFill");
+  const rail = document.getElementById("chapterRail");
+  const navLinks = [...document.querySelectorAll(".hud-links a")];
+  const n = els.length;
+
+  // wrap each chapter's content in an internal scroll container
+  const scenes = els.map((el) => {
+    const inner = document.createElement("div");
+    inner.className = "scene-inner";
+    while (el.firstChild) inner.appendChild(el.firstChild);
+    el.appendChild(inner);
+    const more = document.createElement("span");
+    more.className = "scene-more mono";
+    more.textContent = "SCROLL FOR MORE ↓";
+    el.appendChild(more);
+    el.classList.add("scene");
+    return { el, inner, target: 0 };
+  });
+
+  const dots = scenes.map((s, i) => {
+    const b = document.createElement("button");
+    b.className = "rail-dot";
+    b.setAttribute("aria-label", s.el.dataset.chapter);
+    b.addEventListener("click", () => go(i));
+    rail.appendChild(b);
+    return b;
+  });
+
+  let cur = -1;
+  let transitioning = false;
+  let acc = 0, lastWheel = 0;
+
+  const maxScroll = (s) => Math.max(0, s.inner.scrollHeight - s.inner.clientHeight);
+
+  function revealScene(scene) {
+    const items = scene.el.querySelectorAll(".reveal:not(.visible), .donut-panel:not(.visible)");
+    items.forEach((el, i) => {
+      setTimeout(() => el.classList.add("visible"), 140 + Math.min(i * 70, 640));
+    });
   }
 
-  // parallax accents: selector -> speed
-  const PRLX = [
-    [".scale-visual", 0.09],
-    [".rocket-svg", 0.10],
-    [".anatomy-svg", 0.07],
-    [".donut-wrap", 0.07],
-    ["#orbitCanvas", 0.05],
-  ];
-  let prlxItems = [];
+  function go(i, instant = false) {
+    i = Math.max(0, Math.min(n - 1, i));
+    if (i === cur || transitioning) return;
+    const dir = i > cur ? 1 : -1;
+    const prev = cur;
+    cur = i;
+    const scene = scenes[i];
 
-  function refresh() {
-    if (!enabled) return;
-    spacer.style.height = main.offsetHeight + "px";
-    offsets = new Map();
-    document.querySelectorAll("[id], .bridge, .footer").forEach((el) => offsets.set(el, offsetOf(el)));
-    prlxItems = PRLX.map(([sel, speed]) => {
-      const el = document.querySelector(sel);
-      return el ? { el, speed, top: offsetOf(el), h: el.offsetHeight } : null;
-    }).filter(Boolean);
-  }
-
-  function scrollToEl(el) {
-    if (!el) return;
-    if (!enabled) { el.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }); return; }
-    // compute fresh — cached offsets can go stale while fonts/layout settle
-    window.scrollTo(0, offsetOf(el));
-  }
-
-  let spacer;
-  if (enabled) {
-    document.documentElement.classList.add("smooth");
-    document.body.classList.add("smooth");
-    spacer = document.createElement("div");
-    spacer.id = "scroll-spacer";
-    spacer.setAttribute("aria-hidden", "true");
-    document.body.appendChild(spacer);
-    refresh();
-    new ResizeObserver(refresh).observe(main);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
-
-    // intercept in-page anchors (fixed main breaks native anchor math)
-    document.addEventListener("click", (e) => {
-      const a = e.target.closest('a[href^="#"]');
-      if (!a) return;
-      e.preventDefault();
-      const hash = a.getAttribute("href");
-      if (hash === "#top") { window.scrollTo(0, 0); return; }
-      const el = document.querySelector(hash);
-      if (!el) return;
-      scrollToEl(el);
-      if (a.classList.contains("skip-link")) {
-        el.setAttribute("tabindex", "-1");
-        el.focus({ preventScroll: true });
-      }
+    if (!instant) { transitioning = true; Scene.travel(dir); }
+    scenes.forEach((s, idx) => {
+      s.el.classList.toggle("above", idx < i);
+      s.el.classList.toggle("active", idx === i);
     });
 
-    const vh = () => window.innerHeight;
-    (function frame() {
-      smooth += (window.scrollY - smooth) * 0.085;
-      if (Math.abs(window.scrollY - smooth) < 0.05) smooth = window.scrollY;
-      main.style.transform = `translate3d(0, ${(-smooth).toFixed(2)}px, 0)`;
+    // entering from below shows the end of a long chapter
+    scene.target = prev >= 0 && dir < 0 ? maxScroll(scene) : 0;
+    scene.inner.scrollTop = scene.target;
 
-      // hero exit: lags behind, fades and shrinks as you leave
-      if (smooth < vh() * 1.2) {
-        const p = Math.min(Math.max(smooth / (vh() * 0.7), 0), 1);
-        hero.style.opacity = String(1 - p * 0.92);
-        hero.style.transform = `translate3d(0, ${(smooth * 0.18).toFixed(1)}px, 0) scale(${(1 - p * 0.05).toFixed(4)})`;
-      }
+    hudChapter.textContent = scene.el.dataset.chapter;
+    hudScroll.textContent = `CH ${String(i + 1).padStart(2, "0")} / ${n}`;
+    fill.style.width = (i / (n - 1)) * 100 + "%";
+    const [fx, fs] = FRAMING[frameKey(scene.el)] || [0, 1];
+    Scene.setShape(scene.el.dataset.shape, scene.el.dataset.tint);
+    Scene.setFraming(fx, fs);
+    dots.forEach((d, idx) => d.classList.toggle("active", idx === i));
+    navLinks.forEach((a) => a.classList.toggle("active", scene.el.id && a.getAttribute("href") === "#" + scene.el.id));
+    if (scene.el.id) history.replaceState(null, "", "#" + scene.el.id);
 
-      // parallax accents drift slower than the page
-      const center = smooth + vh() * 0.5;
-      for (const it of prlxItems) {
-        const d = (it.top + it.h * 0.5) - center;
-        if (Math.abs(d) < vh() * 1.4) {
-          it.el.style.transform = `translate3d(0, ${(d * it.speed).toFixed(1)}px, 0)`;
-        }
-      }
-      requestAnimationFrame(frame);
-    })();
+    revealScene(scene);
+    document.dispatchEvent(new CustomEvent("scenechange", { detail: { el: scene.el, index: i } }));
+    if (!instant) setTimeout(() => { transitioning = false; }, 880);
   }
 
-  return { enabled, scrollToEl };
+  // wheel: feed the chapter's internal scroll first, then jump chapters
+  window.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    if (transitioning || cur < 0) return;
+    const d = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+    const s = scenes[cur];
+    const max = maxScroll(s);
+    const canConsume = (d > 0 && s.target < max - 1) || (d < 0 && s.target > 1);
+    if (canConsume) {
+      s.target = Math.max(0, Math.min(max, s.target + d));
+      acc = 0;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastWheel > 260) acc = 0;
+    lastWheel = now;
+    acc += d;
+    if (Math.abs(acc) > 130) {
+      const dir = Math.sign(acc);
+      acc = 0;
+      go(cur + dir);
+    }
+  }, { passive: false });
+
+  // keyboard flight
+  window.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea, select")) return;
+    const s = scenes[cur];
+    if (!s) return;
+    const max = maxScroll(s);
+    const innerStep = (d) => {
+      const can = (d > 0 && s.target < max - 1) || (d < 0 && s.target > 1);
+      if (can) { s.target = Math.max(0, Math.min(max, s.target + d)); return true; }
+      return false;
+    };
+    switch (e.key) {
+      case "ArrowDown": case "PageDown":
+        e.preventDefault(); if (!innerStep(e.key === "PageDown" ? 400 : 140)) go(cur + 1); break;
+      case " ":
+        if (e.target.closest("button, a")) return;
+        e.preventDefault(); if (!innerStep(400)) go(cur + 1); break;
+      case "ArrowUp": case "PageUp":
+        e.preventDefault(); if (!innerStep(e.key === "PageUp" ? -400 : -140)) go(cur - 1); break;
+      case "Home": e.preventDefault(); go(0); break;
+      case "End": e.preventDefault(); go(n - 1); break;
+    }
+  });
+
+  // in-page anchors fly to their chapter
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    const hash = a.getAttribute("href");
+    const idx = hash === "#top" ? 0 : scenes.findIndex((s) => "#" + s.el.id === hash);
+    if (idx < 0) return;
+    go(idx);
+    if (a.classList.contains("skip-link")) {
+      scenes[idx].el.setAttribute("tabindex", "-1");
+      scenes[idx].el.focus({ preventScroll: true });
+    }
+  });
+
+  // ease internal scroll + "more below" cue
+  (function frame() {
+    const s = scenes[cur];
+    if (s) {
+      const max = maxScroll(s);
+      s.target = Math.min(s.target, max);
+      s.inner.scrollTop += (s.target - s.inner.scrollTop) * 0.12;
+      s.el.classList.toggle("has-more", s.inner.scrollTop < max - 6);
+    }
+    requestAnimationFrame(frame);
+  })();
+
+  // start at the hash chapter (or the hero) once the preloader lifts
+  function start() {
+    const idx = location.hash ? Math.max(0, scenes.findIndex((s) => "#" + s.el.id === location.hash)) : 0;
+    go(idx, true);
+  }
+  if (document.getElementById("preloader").classList.contains("done")) start();
+  else document.addEventListener("preloaded", start, { once: true });
+
+  return { active: true, go };
 })();
 
 /* ------------------------------------------------------------
-   Chapters: HUD readout, particle shape + framing, rail, nav
+   Classic mode (touch / reduced motion): document scroll + IO
    ------------------------------------------------------------ */
 (() => {
+  if (Deck.active) return;
+
   const chapters = [...document.querySelectorAll("[data-chapter]")];
   const hudChapter = document.getElementById("hudChapter");
   const rail = document.getElementById("chapterRail");
   const navLinks = [...document.querySelectorAll(".hud-links a")];
 
-  // per-chapter object framing: x in [-1,1], scale multiplier
-  const FRAMING = {
-    hero: [0, 1.12], scale: [0.65, 0.8], concepts: [-0.65, 0.8], stars: [0.65, 0.85],
-    blackholes: [0.7, 0.7], light: [-0.65, 0.75], bigbang: [0.65, 0.85], bridge: [0, 1.1],
-    rockets: [0.65, 0.8], anatomy: [-0.7, 0.7], equation: [0.7, 0.7], engines: [-0.65, 0.75],
-    orbit: [0.7, 0.7], footer: [0, 1.1],
-  };
-  const frameKey = (sec) => sec.id || (sec.classList.contains("bridge") ? "bridge" : sec.classList.contains("footer") ? "footer" : "hero");
-
-  const dots = chapters.map((sec, i) => {
+  const dots = chapters.map((sec) => {
     const b = document.createElement("button");
     b.className = "rail-dot";
     b.setAttribute("aria-label", sec.dataset.chapter);
-    b.addEventListener("click", () => Motion.scrollToEl(sec));
+    b.addEventListener("click", () => sec.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" }));
     rail.appendChild(b);
     return b;
   });
@@ -461,18 +536,11 @@ const Motion = (() => {
       const [fx, fs] = FRAMING[frameKey(sec)] || [0, 1];
       Scene.setFraming(fx, fs);
       dots.forEach((d, i) => d.classList.toggle("active", i === idx));
-      if (sec.id) {
-        navLinks.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + sec.id));
-      }
+      if (sec.id) navLinks.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + sec.id));
     }
   }, { rootMargin: "-38% 0px -48% 0px" });
   chapters.forEach((c) => obs.observe(c));
-})();
 
-/* ------------------------------------------------------------
-   Scroll: reveals, progress, scroll %
-   ------------------------------------------------------------ */
-(() => {
   const revealObs = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (e.isIntersecting) { e.target.classList.add("visible"); revealObs.unobserve(e.target); }
@@ -529,15 +597,16 @@ const Motion = (() => {
    ------------------------------------------------------------ */
 (() => {
   const nums = document.querySelectorAll(".stat-num");
-  const obs = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      obs.unobserve(e.target);
-      const el = e.target;
+  let done = false;
+
+  function run() {
+    if (done) return;
+    done = true;
+    nums.forEach((el) => {
       const target = parseFloat(el.dataset.count);
       const suffix = el.dataset.suffix || "";
       const decimals = el.dataset.count.includes(".") ? 1 : 0;
-      if (reducedMotion) { el.textContent = target.toFixed(decimals) + suffix; continue; }
+      if (reducedMotion) { el.textContent = target.toFixed(decimals) + suffix; return; }
       const t0 = performance.now(), dur = 1600;
       (function tick(t) {
         const p = Math.min((t - t0) / dur, 1);
@@ -545,9 +614,19 @@ const Motion = (() => {
         el.textContent = (target * eased).toFixed(decimals) + suffix;
         if (p < 1) requestAnimationFrame(tick);
       })(t0);
-    }
-  }, { threshold: 0.4 });
-  nums.forEach((n) => obs.observe(n));
+    });
+  }
+
+  if (Deck.active) {
+    document.addEventListener("scenechange", (e) => {
+      if (e.detail.el.querySelector(".stat-num")) run();
+    });
+  } else {
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { obs.disconnect(); run(); }
+    }, { threshold: 0.4 });
+    nums.forEach((n) => obs.observe(n));
+  }
 })();
 
 /* ------------------------------------------------------------
@@ -790,7 +869,7 @@ const Motion = (() => {
   let body = null;
   let trail = [];
   let state = "flying";
-  let running = true;
+  let running = false;
 
   function launch() {
     const v = +slider.value / 10;
@@ -893,10 +972,14 @@ const Motion = (() => {
   slider.addEventListener("input", launch);
   replayBtn.addEventListener("click", launch);
 
-  const visObs = new IntersectionObserver((entries) => {
-    running = entries[0].isIntersecting;
-  }, { threshold: 0.05 });
-  visObs.observe(canvas);
+  if (Deck.active) {
+    document.addEventListener("scenechange", (e) => { running = e.detail.el.contains(canvas); });
+  } else {
+    const visObs = new IntersectionObserver((entries) => {
+      running = entries[0].isIntersecting;
+    }, { threshold: 0.05 });
+    visObs.observe(canvas);
+  }
 
   launch();
   if (reducedMotion) {
