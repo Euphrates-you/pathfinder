@@ -220,16 +220,26 @@ const Scene = (() => {
     },
   };
 
-  const TINTS = { ice: [159, 212, 255], warm: [255, 190, 130] };
+  const TINTS = {
+    ice: [200, 215, 255],
+    violet: [178, 145, 255],
+    magenta: [242, 130, 205],
+    cyan: [115, 225, 245],
+    gold: [255, 205, 125],
+    warm: [255, 175, 115],
+  };
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = window.innerWidth; h = window.innerHeight;
     canvas.width = w * dpr; canvas.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    stars = Array.from({ length: 130 }, () => ({
-      x: rnd() * w, y: rnd() * h, r: rnd() * 1.1 + 0.3, a: rnd() * 0.5 + 0.15, tw: rnd() * TAU,
-    }));
+    stars = Array.from({ length: 130 }, () => {
+      // stellar temperatures: most white-ish, some gold, blue, and rose
+      const t = rnd();
+      const hue = t < 0.58 ? "208,215,255" : t < 0.76 ? "255,216,160" : t < 0.9 ? "160,190,255" : "255,170,195";
+      return { x: rnd() * w, y: rnd() * h, r: rnd() * 1.1 + 0.3, a: rnd() * 0.5 + 0.15, tw: rnd() * TAU, hue };
+    });
   }
 
   function setShape(name, tintName) {
@@ -258,10 +268,10 @@ const Scene = (() => {
       const alpha = reducedMotion ? s.a : s.a * (0.6 + 0.4 * Math.sin(s.tw + time * 1.4));
       const len = warp * depth;
       if (len > 3) {
-        ctx.fillStyle = `rgba(200,225,250,${(alpha * 0.6).toFixed(3)})`;
+        ctx.fillStyle = `rgba(${s.hue},${(alpha * 0.6).toFixed(3)})`;
         ctx.fillRect(s.x, vel > 0 ? sy : sy - len, s.r * 0.8, len + s.r);
       } else {
-        ctx.fillStyle = `rgba(200,225,250,${alpha.toFixed(3)})`;
+        ctx.fillStyle = `rgba(${s.hue},${alpha.toFixed(3)})`;
         ctx.fillRect(s.x, sy, s.r, s.r);
       }
     }
