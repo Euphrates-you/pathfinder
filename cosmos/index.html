@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COSMOS — An Infinite Journey Through Spacetime</title>
+<meta name="description" content="A real-3D infinite-scroll voyage from low Earth orbit to the event horizon — physics explained planet by planet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ══════════ PRELOADER ══════════ -->
+<div id="preloader">
+  <div class="pre-inner">
+    <div class="pre-logo mono">COSMOS<sup>∞</sup></div>
+    <div class="pre-pct mono" id="pre-pct">000</div>
+    <div class="pre-bar"><div id="pre-fill"></div></div>
+    <div class="pre-label mono">COMPILING SPACETIME · PLOTTING TRAJECTORY</div>
+  </div>
+</div>
+
+<!-- ══════════ 3D SCENE ══════════ -->
+<canvas id="scene"></canvas>
+
+<!-- horizon blackout + film grain + vignette -->
+<div id="blackout"><div class="blackout-msg mono">— HORIZON CROSSED · ALL WORLDLINES CONVERGE · TIME RESETS —</div></div>
+<div id="vignette"></div>
+<div id="grain"></div>
+
+<!-- ══════════ HUD ══════════ -->
+<header class="hud hud-top">
+  <div class="logo mono">COSMOS<sup>∞</sup></div>
+  <div class="hud-chapter mono"><span id="hud-ch-num">00</span>&nbsp;/&nbsp;<span id="hud-ch-name">ORIGIN</span></div>
+</header>
+
+<footer class="hud hud-bottom">
+  <div class="hud-cell mono" id="hud-coord">X+000 Y+002 Z+052</div>
+  <div class="hud-progress">
+    <div class="progress-track"><div id="progress-fill"></div></div>
+    <span class="mono" id="hud-pct">000%</span>
+  </div>
+  <div class="hud-cell mono" id="hud-vel">V 00.0 KM/S</div>
+</footer>
+
+<div class="scroll-hint mono" id="scroll-hint">SCROLL TO FALL FORWARD <span class="hint-arrow">↓</span></div>
+
+<div class="corner c-tl"></div>
+<div class="corner c-tr"></div>
+<div class="corner c-bl"></div>
+<div class="corner c-br"></div>
+
+<!-- chapter nav dots -->
+<nav id="ch-nav" aria-label="Chapters"></nav>
+
+<!-- ══════════ CHAPTER OVERLAYS ══════════ -->
+<main id="chapters">
+
+  <!-- 00 · HERO -->
+  <section class="chapter hero" data-ch="0" style="--accent:#8db4ff">
+    <p class="ch-index mono">00 / ORIGIN — LOW EARTH ORBIT</p>
+    <h1 class="hero-title">COSMOS</h1>
+    <p class="hero-sub mono">AN INFINITE JOURNEY THROUGH SPACETIME</p>
+    <p class="ch-body">From low orbit to the event horizon — eight stops, one continuous fall.
+    Nothing here is a photograph: every world is computed live, in three dimensions, as you move.</p>
+    <p class="hero-cta mono">SCROLL — THE JOURNEY NEVER ENDS</p>
+  </section>
+
+  <!-- 01 · EARTH -->
+  <section class="chapter side-left" data-ch="1" style="--accent:#4da3ff">
+    <p class="ch-index mono">01 / EARTH</p>
+    <h2 class="ch-title">GRAVITY</h2>
+    <p class="ch-sub mono">FALLING, FOREVER</p>
+    <p class="ch-body">Gravity is not a pull — it is geometry. Earth's mass bends the spacetime
+    around it, and everything nearby follows the straightest possible path through that curve.
+    The ISS doesn't float: it <em>falls</em> around the planet at 7.66 km/s, moving sideways so
+    fast it keeps missing the ground. That is all an orbit is.</p>
+    <div class="ch-formula mono">g = GM / r² ≈ 9.81 m/s²</div>
+    <ul class="ch-data mono">
+      <li><span>MASS</span>5.97×10²⁴ KG</li>
+      <li><span>RADIUS</span>6 371 KM</li>
+      <li><span>ORBITAL V</span>7.9 KM/S</li>
+    </ul>
+  </section>
+
+  <!-- 02 · MARS -->
+  <section class="chapter side-right" data-ch="2" style="--accent:#ff6b4a">
+    <p class="ch-index mono">02 / MARS</p>
+    <h2 class="ch-title">ESCAPE</h2>
+    <p class="ch-sub mono">THE TYRANNY OF THE ROCKET EQUATION</p>
+    <p class="ch-body">To leave a world you must outrun its gravity well — 11.2 km/s on Earth,
+    just 5.0 on Mars. But rockets carry their own fuel, and fuel has mass, so fuel needs fuel:
+    payload grows linearly, propellant exponentially. This one equation is why spaceflight is
+    hard — and why Mars, with its shallow well, is the obvious second home.</p>
+    <div class="ch-formula mono">Δv = vₑ · ln( m₀ / m₁ )</div>
+    <ul class="ch-data mono">
+      <li><span>GRAVITY</span>0.38 G</li>
+      <li><span>ESCAPE V</span>5.03 KM/S</li>
+      <li><span>TRANSFER</span>≈ 210 DAYS</li>
+    </ul>
+  </section>
+
+  <!-- 03 · JUPITER -->
+  <section class="chapter side-left" data-ch="3" style="--accent:#ffb066">
+    <p class="ch-index mono">03 / JUPITER</p>
+    <h2 class="ch-title">SCALE</h2>
+    <p class="ch-sub mono">THE FAILED STAR</p>
+    <p class="ch-body">Jupiter outweighs every other planet combined — two and a half times
+    over — yet it would need 80× more mass to ignite fusion and become a star. Inside, pressure
+    crushes hydrogen into a liquid metal ocean. The Great Red Spot is a single storm wider than
+    Earth that has raged for at least 350 years.</p>
+    <div class="ch-formula mono">M♃ = 318 M⊕ = 2.5 × Σ planets</div>
+    <ul class="ch-data mono">
+      <li><span>VOLUME</span>1 321 EARTHS</li>
+      <li><span>DAY</span>9.9 HOURS</li>
+      <li><span>WIND</span>430 KM/H</li>
+    </ul>
+  </section>
+
+  <!-- 04 · SATURN -->
+  <section class="chapter side-right" data-ch="4" style="--accent:#ffd98f">
+    <p class="ch-index mono">04 / SATURN</p>
+    <h2 class="ch-title">TIDES</h2>
+    <p class="ch-sub mono">THE SHREDDED MOON</p>
+    <p class="ch-body">Gravity pulls harder on the near side of a body than the far side — that
+    difference is the tide. Stray too close and the difference exceeds the strength of rock
+    itself: the Roche limit. Saturn's rings are likely the wreckage of a moon that crossed that
+    line — 282,000 km wide, yet only about ten meters thick.</p>
+    <div class="ch-formula mono">d ≈ 2.44 R ( ρₚ / ρₘ )^⅓</div>
+    <ul class="ch-data mono">
+      <li><span>RING SPAN</span>282 000 KM</li>
+      <li><span>THICKNESS</span>~10 M</li>
+      <li><span>DENSITY</span>0.69 G/CM³ — IT FLOATS</li>
+    </ul>
+  </section>
+
+  <!-- 05 · SUN -->
+  <section class="chapter side-left" data-ch="5" style="--accent:#ffcf4d">
+    <p class="ch-index mono">05 / SOL</p>
+    <h2 class="ch-title">FUSION</h2>
+    <p class="ch-sub mono">MASS INTO LIGHT</p>
+    <p class="ch-body">Every second the Sun fuses 600 million tonnes of hydrogen into helium —
+    and 4 million tonnes of mass simply vanish, converted to pure energy. A photon born in the
+    core spends ~100,000 years ricocheting toward the surface. Its final leg — to your eyes —
+    takes eight minutes.</p>
+    <div class="ch-formula mono">E = mc²</div>
+    <ul class="ch-data mono">
+      <li><span>CORE</span>15.7 MILLION K</li>
+      <li><span>OUTPUT</span>3.8×10²⁶ W</li>
+      <li><span>MASS → LIGHT</span>4M TONNES/S</li>
+    </ul>
+  </section>
+
+  <!-- 06 · PULSAR -->
+  <section class="chapter side-right" data-ch="6" style="--accent:#9fd8ff">
+    <p class="ch-index mono">06 / PULSAR PSR B1919+21</p>
+    <h2 class="ch-title">COLLAPSE</h2>
+    <p class="ch-sub mono">A CITY-SIZED ATOM</p>
+    <p class="ch-body">When a massive star dies, its core collapses until electrons are crushed
+    into protons — leaving a ball of pure neutrons twenty kilometers across. One sugar cube of
+    it outweighs a mountain. It spins hundreds of times per second, sweeping radio beams across
+    the galaxy like a lighthouse — a clock so stable we use it to test general relativity.</p>
+    <div class="ch-formula mono">ρ ≈ 5×10¹⁷ kg/m³</div>
+    <ul class="ch-data mono">
+      <li><span>RADIUS</span>~12 KM</li>
+      <li><span>SPIN</span>≤ 716 REV/S</li>
+      <li><span>FIELD</span>10⁸ TESLA</li>
+    </ul>
+  </section>
+
+  <!-- 07 · BLACK HOLE -->
+  <section class="chapter side-left" data-ch="7" style="--accent:#ff9d45">
+    <p class="ch-index mono">07 / GARGANTUA-CLASS SINGULARITY</p>
+    <h2 class="ch-title">SINGULARITY</h2>
+    <p class="ch-sub mono">WHERE TIME POINTS INWARD</p>
+    <p class="ch-body">Compress anything below its Schwarzschild radius and escape velocity
+    exceeds light itself. The event horizon isn't a surface — it's a one-way boundary in time:
+    inside, every possible future points toward the center. Watch a friend fall in and they
+    redden, slow, and freeze at the horizon forever. To them, nothing special happens at all —
+    until the tides pull them into spaghetti.</p>
+    <div class="ch-formula mono">rₛ = 2GM / c²</div>
+    <ul class="ch-data mono">
+      <li><span>PHOTON SPHERE</span>1.5 rₛ</li>
+      <li><span>ESCAPE V</span>&gt; c</li>
+      <li><span>Δt AT HORIZON</span>→ ∞</li>
+    </ul>
+  </section>
+
+  <!-- 08 · HORIZON / LOOP -->
+  <section class="chapter hero" data-ch="8" style="--accent:#c9a0ff">
+    <p class="ch-index mono">08 / EVENT HORIZON</p>
+    <h2 class="ch-title infinity">∞</h2>
+    <p class="ch-sub mono">BEYOND THE HORIZON</p>
+    <p class="ch-body">Past this line, all paths lead inward — and ours leads back to the
+    beginning. Keep scrolling. The universe loops.</p>
+    <ul class="ch-data mono center">
+      <li><span>STATUS</span>INFALLING</li>
+      <li><span>EXIT</span>NONE</li>
+      <li><span>NEXT</span>ORIGIN</li>
+    </ul>
+  </section>
+
+</main>
+
+<!-- custom cursor -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
