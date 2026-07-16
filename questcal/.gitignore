@@ -1,0 +1,9 @@
+# Dependencies (reinstall with: npm install)
+node_modules/
+
+# Build output (rebuild with: npm run build / npm run build:artifact)
+dist/
+
+# Local env files — never commit API keys
+.env
+.env.*

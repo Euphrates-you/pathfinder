@@ -1,0 +1,322 @@
+@import "tailwindcss";
+
+/* ============================================================
+   THEME SYSTEM
+   Each theme is a set of CSS variables under [data-theme="..."].
+   Surfaces are TRANSLUCENT (rgba) on purpose: the .glass utility
+   below blurs whatever is behind them, so the colored glow field
+   painted on <body> shines through every panel.
+   ============================================================ */
+
+/* ---- The System (default): Solo-Leveling-style holographic glass ---- */
+:root,
+[data-theme="system"] {
+  --bg: #04060c;
+  --surface: rgba(18, 32, 58, 0.44);
+  --surface-2: rgba(38, 62, 105, 0.38);
+  --edge: rgba(96, 165, 250, 0.26);
+  --ink: #dbeaff;
+  --ink-muted: #7e9cc4;
+  --accent: #38bdf8;      /* System cyan */
+  --accent-2: #a78bfa;    /* mana violet */
+  --gold: #fbbf24;        /* XP gold */
+  --success: #34d399;
+  --danger: #fb7185;
+  --font-display: 'Rajdhani', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 10px;
+  --glow: 0 0 26px;
+  color-scheme: dark;
+}
+
+/* ---- Dark Fantasy: torchlit violet & gold ---- */
+[data-theme="dark-fantasy"] {
+  --bg: #0b0813;
+  --surface: rgba(33, 25, 55, 0.5);
+  --surface-2: rgba(50, 38, 82, 0.46);
+  --edge: rgba(139, 92, 246, 0.24);
+  --ink: #ece6f8;
+  --ink-muted: #9c92b8;
+  --accent: #8b5cf6;
+  --accent-2: #f472b6;
+  --gold: #fbbf24;
+  --success: #34d399;
+  --danger: #f87171;
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 14px;
+  --glow: 0 0 24px;
+  color-scheme: dark;
+}
+
+/* ---- Clean Minimal: bright frosted glass ---- */
+[data-theme="minimal"] {
+  --bg: #eef0f4;
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-2: rgba(244, 244, 248, 0.7);
+  --edge: rgba(23, 23, 33, 0.12);
+  --ink: #17171c;
+  --ink-muted: #5d5d68;
+  --accent: #6366f1;
+  --accent-2: #ec4899;
+  --gold: #d97706;
+  --success: #059669;
+  --danger: #dc2626;
+  --font-display: 'Sora', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 12px;
+  --glow: 0 4px 20px;
+  color-scheme: light;
+}
+
+/* ---- Cyberpunk Neon: chrome rain & neon signs ---- */
+[data-theme="cyberpunk"] {
+  --bg: #050a0f;
+  --surface: rgba(12, 26, 46, 0.5);
+  --surface-2: rgba(18, 38, 66, 0.48);
+  --edge: rgba(34, 211, 238, 0.28);
+  --ink: #e6f7ff;
+  --ink-muted: #7fa3bd;
+  --accent: #22d3ee;
+  --accent-2: #f472b6;
+  --gold: #facc15;
+  --success: #4ade80;
+  --danger: #fb7185;
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 6px;
+  --glow: 0 0 28px;
+  color-scheme: dark;
+}
+
+/* ---- Cozy Pixel: 16-bit campfire vibes ---- */
+[data-theme="pixel"] {
+  --bg: #1a1423;
+  --surface: rgba(48, 34, 62, 0.56);
+  --surface-2: rgba(64, 46, 82, 0.52);
+  --edge: rgba(255, 158, 100, 0.22);
+  --ink: #f5e9d9;
+  --ink-muted: #bda891;
+  --accent: #ff9e64;
+  --accent-2: #e05f8f;
+  --gold: #ffd166;
+  --success: #7ec850;
+  --danger: #f8719b;
+  --font-display: 'Press Start 2P', monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --radius: 4px;
+  --glow: 0 0 18px;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Map the variables into Tailwind tokens ("inline" keeps them
+   live, so a theme switch instantly recolors every utility).
+   Usage: bg-bg, bg-surface, text-ink, border-edge, text-accent…
+   ============================================================ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-edge: var(--edge);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-gold: var(--gold);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --radius-theme: var(--radius);
+}
+
+/* ============================================================
+   Base: the glow field + film grain the glass panels live on
+   ============================================================ */
+html {
+  background: var(--bg);
+}
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  /* Three colored light sources — accent, secondary, gold — so the
+     blur behind every panel picks up real color variation. */
+  background:
+    radial-gradient(1100px 700px at 85% -8%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 62%),
+    radial-gradient(900px 640px at -12% 108%, color-mix(in oklab, var(--accent-2) 11%, transparent), transparent 60%),
+    radial-gradient(700px 520px at 8% 22%, color-mix(in oklab, var(--gold) 5%, transparent), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle film grain over everything (pure SVG noise — no image file) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   GLASS — the signature panel material.
+   Three layers in one background:
+     1. a faint top-light sheen        (padding-box)
+     2. the theme's translucent tint    (padding-box)
+     3. a gradient drawn IN the border  (border-box) → glowing edge
+   ============================================================ */
+.glass {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(165deg, color-mix(in oklab, var(--ink) 7%, transparent), transparent 42%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(150deg,
+      color-mix(in oklab, var(--accent) 55%, var(--edge)),
+      var(--edge) 40%,
+      color-mix(in oklab, var(--accent-2) 40%, var(--edge))) border-box;
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--ink) 9%, transparent),
+    0 10px 36px rgb(0 0 0 / 0.35);
+}
+
+/* Stronger, more opaque glass for modals/overlays (readability first) */
+.glass-strong {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(165deg, color-mix(in oklab, var(--ink) 8%, transparent), transparent 45%) padding-box,
+    linear-gradient(
+      color-mix(in oklab, var(--bg) 55%, var(--surface)),
+      color-mix(in oklab, var(--bg) 55%, var(--surface))) padding-box,
+    linear-gradient(150deg,
+      color-mix(in oklab, var(--accent) 65%, var(--edge)),
+      var(--edge) 45%,
+      color-mix(in oklab, var(--accent-2) 50%, var(--edge))) border-box;
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--ink) 10%, transparent),
+    0 24px 64px rgb(0 0 0 / 0.5);
+}
+
+[data-theme="minimal"] .glass,
+[data-theme="minimal"] .glass-strong {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 8px 28px rgb(23 23 33 / 0.1);
+}
+
+/* ============================================================
+   SYSTEM WINDOW dressing — the Solo-Leveling corner brackets
+   used on notifications, the level-up window and status panel.
+   ============================================================ */
+.sys-frame { position: relative; }
+/* Unlayered CSS outranks Tailwind's utility layer, so restore the
+   positioning utilities when they're used together with .sys-frame. */
+.sys-frame.fixed { position: fixed; }
+.sys-frame.absolute { position: absolute; }
+.sys-frame::before,
+.sys-frame::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--accent) 70%, transparent));
+}
+.sys-frame::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+.sys-frame::after  { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+
+/* Holographic gradient text for headings and big numbers */
+.text-holo {
+  background: linear-gradient(94deg,
+    var(--accent) 10%,
+    color-mix(in oklab, var(--accent) 45%, var(--accent-2)) 50%,
+    var(--accent-2) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Page / view entrance — a CSS animation on purpose: CSS animations are
+   clock-based, so they can never leave the app stuck mid-transition when
+   the browser throttles JS animation frames in background windows. */
+.page-enter { animation: pageIn 0.22s ease-out both; }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Light sweep that travels across XP / progress bars */
+.bar-sheen { position: relative; overflow: hidden; }
+.bar-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 42%, rgb(255 255 255 / 0.32) 50%, transparent 58%);
+  transform: translateX(-100%);
+  animation: sheen 2.8s ease-in-out infinite;
+}
+@keyframes sheen { to { transform: translateX(100%); } }
+
+/* Month-grid day cells (translucent so the glass container reads through) */
+.cell-in  { background: color-mix(in oklab, var(--ink) 3%, transparent); }
+.cell-out { background: color-mix(in oklab, var(--bg) 45%, transparent); }
+
+/* The pixel font renders huge — shrink display text whenever it's active
+   (the app sets data-pixelfont on <html> when Press Start 2P is in use) */
+[data-pixelfont="true"] .font-display { font-size: 0.72em; letter-spacing: 0.02em; line-height: 1.5; }
+
+/* Calendar density: --hour-h drives week/day view row heights */
+:root { --hour-h: 56px; --month-cell: 112px; }
+[data-density="compact"] { --hour-h: 42px; --month-cell: 88px; }
+
+/* Hover lift — cards rise slightly and pick up an accent glow.
+   Works alongside .glass (the hover rule wins on box-shadow). */
+.hover-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--ink) 10%, transparent),
+    0 14px 44px rgb(0 0 0 / 0.45),
+    0 0 22px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+[data-theme="minimal"] .hover-lift:hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 12px 32px rgb(23 23 33 / 0.16),
+    0 0 18px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* Soft glow helpers used by accent buttons / active streak flame */
+.glow-accent { box-shadow: var(--glow) color-mix(in oklab, var(--accent) 45%, transparent); }
+.glow-gold   { box-shadow: var(--glow) color-mix(in oklab, var(--gold) 45%, transparent); }
+
+/* Keyboard focus — visible on every theme */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Slim themed scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 8px; }
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
