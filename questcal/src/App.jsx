@@ -34,9 +34,18 @@ export default function App() {
   const { theme, accent, customAccent, font, density } = useSettingsStore()
   const page = useUiStore(s => s.page)
   const seedIfEmpty = useCalendarStore(s => s.seedIfEmpty)
+  const settleEvents = useCalendarStore(s => s.settleEvents)
 
   // First visit: create a few sample events so the board isn't empty.
   useEffect(() => { seedIfEmpty() }, [seedIfEmpty])
+
+  // Pay out attendance XP for plain events whose day has ended —
+  // on load, then once a minute (catches midnight while the app is open).
+  useEffect(() => {
+    settleEvents()
+    const t = setInterval(settleEvents, 60_000)
+    return () => clearInterval(t)
+  }, [settleEvents])
 
   // Push the visual settings onto <html> as attributes / CSS variables.
   useEffect(() => {

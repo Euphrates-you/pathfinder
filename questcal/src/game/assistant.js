@@ -39,8 +39,9 @@ const EVENT_PROPS = {
     type: 'string',
     enum: ['quest', 'event'],
     description:
-      'quest = a task the player completes for XP (study session, workout, chores). ' +
-      'event = a plain schedule entry with no XP and no checkbox (class, appointment, school, practice, birthday).',
+      'quest = a task the player checks off for XP (study session, workout, chores). ' +
+      'event = a schedule entry with no checkbox (class, appointment, school, practice, birthday) — ' +
+      'its attendance XP is granted automatically when its day ends.',
   },
   date: { type: 'string', description: 'yyyy-MM-dd' },
   startTime: { type: 'string', description: 'HH:mm 24h, or "" for any time' },
@@ -270,7 +271,7 @@ Rules:
 - Use the tools to act on the calendar and settings. Never claim you did something without a successful tool result.
 - Two kinds of calendar entries:
   * kind "quest" — a task the player checks off for XP (study, workout, reading, chores). Default.
-  * kind "event" — a plain schedule entry: classes, school, hagwon/academy, appointments, practices, meetups, birthdays. No XP, no checkbox.
+  * kind "event" — a schedule entry: classes, school, hagwon/academy, appointments, practices, meetups, birthdays. No checkbox — its (smaller) attendance XP is paid automatically when the day ends.
   Infer the kind from what the thing IS. When genuinely ambiguous, default to quest for solo effort activities and event for fixed commitments involving other people or institutions.
 - "Every Monday" style requests: compute the concrete dates yourself (default: the next 8 occurrences unless the user gives a range or count) and create them in ONE create_events call.
 - Before editing/deleting/completing, find the events with list_events first.

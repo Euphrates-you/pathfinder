@@ -68,7 +68,7 @@ function EventBlock({ event, hourH }) {
       }}
       title={isQuest(event)
         ? `${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`
-        : `${event.title} · ${event.startTime}`}
+        : `${event.title} · ${event.startTime} · ${event.xp} XP at day's end`}
     >
       <div className="flex items-start gap-1.5">
         <span className="mt-0.5"><CompleteButton event={event} size={15} /></span>
@@ -78,8 +78,7 @@ function EventBlock({ event, hourH }) {
           </span>
           {height > 44 && (
             <span className="block text-[10px] text-ink-muted">
-              {event.startTime} · {event.durationMin}min
-              {isQuest(event) && <> · <span className="text-gold">{event.xp} XP</span></>}
+              {event.startTime} · {event.durationMin}min · <span className="text-gold">{event.xp} XP</span>
             </span>
           )}
         </span>

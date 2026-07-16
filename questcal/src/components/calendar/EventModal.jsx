@@ -10,7 +10,7 @@ import { X, Trash2, Zap, Swords, CalendarDays } from 'lucide-react'
 import { useCalendarStore } from '../../stores/useCalendarStore'
 import { useUiStore } from '../../stores/useUiStore'
 import { CATEGORIES, DIFFICULTY } from '../../game/config'
-import { calcEventXp } from '../../game/xp'
+import { calcEventXp, calcAttendanceXp } from '../../game/xp'
 import { play } from '../../game/sound'
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240]
@@ -51,7 +51,9 @@ export default function EventModal() {
 
   // Everything below is guarded so hooks above always run in the same order.
   const isQuestForm = form?.kind !== 'event'
-  const xpPreview = form && isQuestForm ? calcEventXp(form.difficulty, form.durationMin) : 0
+  const xpPreview = !form ? 0
+    : isQuestForm ? calcEventXp(form.difficulty, form.durationMin)
+    : calcAttendanceXp(form.durationMin)
   const set = (patch) => setForm(f => ({ ...f, ...patch }))
 
   const save = () => {
@@ -93,11 +95,12 @@ export default function EventModal() {
               {editing ? 'Edit' : 'New'} {isQuestForm ? 'quest' : 'event'}
             </h2>
             <div className="flex items-center gap-2">
-              {isQuestForm && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold text-gold bg-surface-2 border border-gold/30 tabular-nums flex items-center gap-1">
-                  <Zap size={11} aria-hidden /> {xpPreview} XP
-                </span>
-              )}
+              <span
+                className="px-2.5 py-1 rounded-full text-xs font-bold text-gold bg-surface-2 border border-gold/30 tabular-nums flex items-center gap-1"
+                title={isQuestForm ? 'Granted when you complete it' : "Granted automatically when the day ends"}
+              >
+                <Zap size={11} aria-hidden /> {xpPreview} XP{!isQuestForm && <span className="font-normal text-ink-muted"> · auto</span>}
+              </span>
               <button onClick={closeModal} aria-label="Close"
                 className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 cursor-pointer">
                 <X size={17} />
@@ -110,7 +113,7 @@ export default function EventModal() {
             <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Entry type">
               {[
                 { id: 'quest', label: 'Quest', hint: 'Complete it for XP', Icon: Swords },
-                { id: 'event', label: 'Event', hint: 'Just a schedule entry', Icon: CalendarDays },
+                { id: 'event', label: 'Event', hint: "XP arrives at day's end", Icon: CalendarDays },
               ].map(({ id, label: l, hint, Icon }) => {
                 const active = (form.kind ?? 'quest') === id
                 return (

@@ -26,7 +26,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { format, addDays } from 'date-fns'
 import { appStorage, SAVE_VERSION } from './storage'
-import { calcEventXp } from '../game/xp'
+import { calcEventXp, calcAttendanceXp } from '../game/xp'
 import { useGameStore } from './useGameStore'
 import { play } from '../game/sound'
 
@@ -57,8 +57,11 @@ export const useCalendarStore = create(
           completedDay: null,
           ...data,
         }
-        // Quests derive XP from difficulty + duration; plain events give none.
-        event.xp = isQuest(event) ? calcEventXp(event.difficulty, event.durationMin) : 0
+        // Quests derive XP from difficulty + duration; plain events earn
+        // attendance XP (paid out automatically when their day ends).
+        event.xp = isQuest(event)
+          ? calcEventXp(event.difficulty, event.durationMin)
+          : calcAttendanceXp(event.durationMin)
         set(s => ({ events: [...s.events, event] }))
         return event
       },
@@ -68,10 +71,13 @@ export const useCalendarStore = create(
           events: s.events.map(e => {
             if (e.id !== id) return e
             const next = { ...e, ...patch }
-            next.xp = isQuest(next) ? calcEventXp(next.difficulty, next.durationMin) : 0
-            // Turning a completed quest into a plain event would strand its
-            // XP — take the XP back and clear the completion first.
-            if (!isQuest(next) && e.completed) {
+            next.xp = isQuest(next)
+              ? calcEventXp(next.difficulty, next.durationMin)
+              : calcAttendanceXp(next.durationMin)
+            // Changing the kind of an already-completed entry would strand
+            // its granted XP — refund it and clear the completion. Quests
+            // can be re-checked; past events re-settle on the next sweep.
+            if (isQuest(next) !== isQuest(e) && e.completed) {
               useGameStore.getState().grantXp(-e.xp)
               next.completed = false
               next.completedAt = null
@@ -80,6 +86,36 @@ export const useCalendarStore = create(
             return next
           }),
         }))
+      },
+
+      /**
+       * Auto-settle plain events whose day has ended: mark them completed
+       * and pay their attendance XP. Runs on app load and once a minute,
+       * so it also fires if the app is left open past midnight.
+       */
+      settleEvents() {
+        const todayKey = format(new Date(), 'yyyy-MM-dd')
+        const due = get().events.filter(e => !isQuest(e) && !e.completed && e.date < todayKey)
+        if (due.length === 0) return 0
+
+        const dueIds = new Set(due.map(e => e.id))
+        set(s => ({
+          events: s.events.map(e => dueIds.has(e.id)
+            ? {
+                ...e,
+                completed: true,
+                // Anchor the timestamp to the event's own start (or midday)
+                // so time-based achievements reflect when it happened.
+                completedAt: `${e.date}T${e.startTime || '12:00'}:00`,
+                completedDay: e.date,
+              }
+            : e),
+        }))
+
+        const game = useGameStore.getState()
+        for (const e of due) game.grantXp(e.xp)
+        game.checkAchievements(get().events)
+        return due.length
       },
 
       deleteEvent(id) {

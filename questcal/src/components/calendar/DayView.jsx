@@ -59,9 +59,15 @@ function LogRow({ event, index }) {
               <span className="block text-xs font-bold text-gold tabular-nums">{event.xp} XP</span>
             </>
           ) : (
-            <span className="block text-[10px] font-display font-bold uppercase tracking-wider text-ink-muted">
-              Event
-            </span>
+            <>
+              <span className="block text-[10px] font-display font-bold uppercase tracking-wider text-ink-muted">
+                {event.completed ? 'Attended' : 'Event'}
+              </span>
+              <span className="block text-xs font-bold text-gold tabular-nums"
+                title="Granted automatically when the day ends">
+                {event.xp} XP{!event.completed && ' · auto'}
+              </span>
+            </>
           )}
         </span>
       </div>
@@ -77,11 +83,12 @@ export default function DayView() {
   const dayEvents = events
     .filter(e => e.date === dayKey)
     .sort((a, b) => ((a.startTime || '99') < (b.startTime || '99') ? -1 : 1))
-  // Progress stats only make sense for quests — plain events just happen.
+  // "Cleared" counts quests only (events settle on their own), but XP
+  // totals include everything — attendance XP is still XP.
   const dayQuests = dayEvents.filter(isQuest)
   const done = dayQuests.filter(e => e.completed)
-  const xpBanked = done.reduce((s, e) => s + e.xp, 0)
-  const xpPossible = dayQuests.reduce((s, e) => s + e.xp, 0)
+  const xpBanked = dayEvents.filter(e => e.completed).reduce((s, e) => s + e.xp, 0)
+  const xpPossible = dayEvents.reduce((s, e) => s + e.xp, 0)
 
   return (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">

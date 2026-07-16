@@ -4,18 +4,22 @@
 // which makes this file trivial to test and reason about.
 // ============================================================
 import {
-  DIFFICULTY, DURATION_XP_PER_30MIN, DURATION_XP_CAP,
+  DIFFICULTY, DURATION_XP_PER_30MIN, DURATION_XP_CAP, EVENT_ATTENDANCE_XP,
   LEVEL_BASE_XP, LEVEL_GROWTH, LEVEL_CAP,
 } from './config'
 
-/** XP reward for an event, from its difficulty + duration. */
+const durationBonus = (durationMin) =>
+  Math.min(DURATION_XP_CAP, Math.floor((durationMin || 0) / 30) * DURATION_XP_PER_30MIN)
+
+/** XP reward for a quest, from its difficulty + duration. */
 export function calcEventXp(difficulty, durationMin = 0) {
   const base = DIFFICULTY[difficulty]?.baseXp ?? DIFFICULTY.medium.baseXp
-  const bonus = Math.min(
-    DURATION_XP_CAP,
-    Math.floor((durationMin || 0) / 30) * DURATION_XP_PER_30MIN,
-  )
-  return base + bonus
+  return base + durationBonus(durationMin)
+}
+
+/** XP for attending a plain event — granted automatically at day's end. */
+export function calcAttendanceXp(durationMin = 0) {
+  return EVENT_ATTENDANCE_XP + durationBonus(durationMin)
 }
 
 /** XP needed to climb from `level` to `level + 1`. */

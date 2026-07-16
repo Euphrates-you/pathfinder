@@ -19,6 +19,11 @@ export const DIFFICULTY = {
 export const DURATION_XP_PER_30MIN = 5   // +5 XP per half hour...
 export const DURATION_XP_CAP = 40        // ...but never more than +40
 
+// Plain events (kind 'event': classes, appointments) pay out automatically
+// when their day ends — this is the attendance base, plus the same
+// duration bonus as quests. Kept lower than quest XP since it's passive.
+export const EVENT_ATTENDANCE_XP = 15
+
 // ---- Level curve ------------------------------------------
 // XP needed to go from level N to N+1 = LEVEL_BASE_XP * N ^ LEVEL_GROWTH
 // (rounded to the nearest 10). Growth > 1 means early levels are fast

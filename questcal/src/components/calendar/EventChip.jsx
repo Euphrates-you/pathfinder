@@ -33,7 +33,7 @@ export default function EventChip({ event }) {
       }}
       title={quest
         ? `${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`
-        : `${event.title}${event.startTime ? ` · ${event.startTime}` : ''}`}
+        : `${event.title}${event.startTime ? ` · ${event.startTime}` : ''} · ${event.xp} XP at day's end`}
     >
       {/* solid dot = quest, hollow ring = plain schedule entry */}
       <span
