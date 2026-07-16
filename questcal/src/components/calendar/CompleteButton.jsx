@@ -7,7 +7,7 @@
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { Check } from 'lucide-react'
-import { useCalendarStore } from '../../stores/useCalendarStore'
+import { useCalendarStore, isQuest } from '../../stores/useCalendarStore'
 
 function themeColors() {
   const css = getComputedStyle(document.documentElement)
@@ -18,6 +18,9 @@ function themeColors() {
 
 export default function CompleteButton({ event, size = 22 }) {
   const toggleComplete = useCalendarStore(s => s.toggleComplete)
+
+  // Plain schedule entries have nothing to complete.
+  if (!isQuest(event)) return null
 
   const onClick = (e) => {
     e.stopPropagation() // don't also open the edit modal behind us

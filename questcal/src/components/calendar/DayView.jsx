@@ -4,8 +4,8 @@
 // ============================================================
 import { format } from 'date-fns'
 import { motion } from 'framer-motion'
-import { Plus, Swords } from 'lucide-react'
-import { useCalendarStore } from '../../stores/useCalendarStore'
+import { Plus, Swords, CalendarDays } from 'lucide-react'
+import { useCalendarStore, isQuest } from '../../stores/useCalendarStore'
 import { useUiStore } from '../../stores/useUiStore'
 import { CATEGORIES, DIFFICULTY } from '../../game/config'
 import TimeGrid from './TimeGrid'
@@ -32,7 +32,13 @@ function LogRow({ event, index }) {
         className={`hover-lift w-full flex items-center gap-3 p-2.5 rounded-xl border border-edge bg-surface hover:bg-surface-2
           cursor-pointer text-left ${event.completed ? 'opacity-60' : ''}`}
       >
-        <CompleteButton event={event} size={26} />
+        {isQuest(event) ? (
+          <CompleteButton event={event} size={26} />
+        ) : (
+          <span className="grid place-items-center size-[26px] shrink-0 text-ink-muted" aria-hidden>
+            <CalendarDays size={17} />
+          </span>
+        )}
         <span className="flex-1 min-w-0">
           <span className={`block font-medium text-sm text-ink truncate ${event.completed ? 'line-through' : ''}`}>
             {event.title}
@@ -43,12 +49,20 @@ function LogRow({ event, index }) {
           </span>
         </span>
         <span className="text-right shrink-0">
-          {/* Solo-Leveling gate rank instead of a plain difficulty word */}
-          <span className="block text-[10px] font-display font-bold uppercase tracking-wider"
-            style={{ color: diff.rankColor, textShadow: `0 0 10px color-mix(in oklab, ${diff.rankColor} 50%, transparent)` }}>
-            {diff.rank}-Rank
-          </span>
-          <span className="block text-xs font-bold text-gold tabular-nums">{event.xp} XP</span>
+          {isQuest(event) ? (
+            <>
+              {/* Solo-Leveling gate rank instead of a plain difficulty word */}
+              <span className="block text-[10px] font-display font-bold uppercase tracking-wider"
+                style={{ color: diff.rankColor, textShadow: `0 0 10px color-mix(in oklab, ${diff.rankColor} 50%, transparent)` }}>
+                {diff.rank}-Rank
+              </span>
+              <span className="block text-xs font-bold text-gold tabular-nums">{event.xp} XP</span>
+            </>
+          ) : (
+            <span className="block text-[10px] font-display font-bold uppercase tracking-wider text-ink-muted">
+              Event
+            </span>
+          )}
         </span>
       </div>
     </motion.li>
@@ -63,9 +77,11 @@ export default function DayView() {
   const dayEvents = events
     .filter(e => e.date === dayKey)
     .sort((a, b) => ((a.startTime || '99') < (b.startTime || '99') ? -1 : 1))
-  const done = dayEvents.filter(e => e.completed)
+  // Progress stats only make sense for quests — plain events just happen.
+  const dayQuests = dayEvents.filter(isQuest)
+  const done = dayQuests.filter(e => e.completed)
   const xpBanked = done.reduce((s, e) => s + e.xp, 0)
-  const xpPossible = dayEvents.reduce((s, e) => s + e.xp, 0)
+  const xpPossible = dayQuests.reduce((s, e) => s + e.xp, 0)
 
   return (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4 items-start">
@@ -78,8 +94,9 @@ export default function DayView() {
           <h2 className="font-display font-bold text-ink">Day log</h2>
         </div>
         <p className="text-xs text-ink-muted mb-4">
-          {done.length}/{dayEvents.length} cleared ·{' '}
+          {done.length}/{dayQuests.length} quests cleared ·{' '}
           <span className="text-gold font-semibold tabular-nums">{xpBanked}/{xpPossible} XP</span> banked
+          {dayEvents.length > dayQuests.length && <> · {dayEvents.length - dayQuests.length} event(s)</>}
         </p>
 
         {dayEvents.length === 0 ? (

@@ -7,7 +7,7 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react'
 import { format, isToday } from 'date-fns'
-import { useCalendarStore } from '../../stores/useCalendarStore'
+import { useCalendarStore, isQuest } from '../../stores/useCalendarStore'
 import { useUiStore } from '../../stores/useUiStore'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 import { CATEGORIES, DIFFICULTY } from '../../game/config'
@@ -66,7 +66,9 @@ function EventBlock({ event, hourH }) {
         // don't block drops on the cells underneath while dragging another event
         pointerEvents: draggingId && draggingId !== event.id ? 'none' : undefined,
       }}
-      title={`${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`}
+      title={isQuest(event)
+        ? `${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`
+        : `${event.title} · ${event.startTime}`}
     >
       <div className="flex items-start gap-1.5">
         <span className="mt-0.5"><CompleteButton event={event} size={15} /></span>
@@ -76,7 +78,8 @@ function EventBlock({ event, hourH }) {
           </span>
           {height > 44 && (
             <span className="block text-[10px] text-ink-muted">
-              {event.startTime} · {event.durationMin}min · <span className="text-gold">{event.xp} XP</span>
+              {event.startTime} · {event.durationMin}min
+              {isQuest(event) && <> · <span className="text-gold">{event.xp} XP</span></>}
             </span>
           )}
         </span>

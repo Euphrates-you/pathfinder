@@ -4,18 +4,23 @@
 // An event looks like:
 // {
 //   id: 'uuid',
+//   kind: 'quest',           // 'quest' = completable task that earns XP
+//                            // 'event' = plain schedule entry (class,
+//                            //   appointment) — no XP, no checkbox
 //   title: 'Gym — leg day',
 //   date: '2026-07-12',      // the day it's scheduled on
 //   startTime: '18:00',      // '' means "any time that day"
 //   durationMin: 60,
 //   category: 'health',      // see CATEGORIES in game/config.js
-//   difficulty: 'hard',      // easy | medium | hard | epic
+//   difficulty: 'hard',      // easy | medium | hard | epic (quests only)
 //   notes: '',
-//   xp: 85,                  // auto-calculated, stored so history is stable
+//   xp: 85,                  // auto-calculated (0 for plain events)
 //   completed: false,
 //   completedAt: null,       // full ISO timestamp (for night-owl checks etc.)
 //   completedDay: null,      // 'yyyy-MM-dd' local day (for streaks/quests)
 // }
+// Saves from before the kind field existed have no `kind` — treat
+// missing as 'quest' everywhere (isQuest helper below).
 // ============================================================
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -27,6 +32,9 @@ import { play } from '../game/sound'
 
 const uid = () => crypto.randomUUID()
 
+/** Older saves have no `kind` — anything not explicitly 'event' is a quest. */
+export const isQuest = (e) => e.kind !== 'event'
+
 export const useCalendarStore = create(
   persist(
     (set, get) => ({
@@ -36,6 +44,7 @@ export const useCalendarStore = create(
       addEvent(data) {
         const event = {
           id: uid(),
+          kind: 'quest',
           title: 'Untitled quest',
           date: format(new Date(), 'yyyy-MM-dd'),
           startTime: '',
@@ -48,8 +57,8 @@ export const useCalendarStore = create(
           completedDay: null,
           ...data,
         }
-        // XP is always derived from difficulty + duration:
-        event.xp = calcEventXp(event.difficulty, event.durationMin)
+        // Quests derive XP from difficulty + duration; plain events give none.
+        event.xp = isQuest(event) ? calcEventXp(event.difficulty, event.durationMin) : 0
         set(s => ({ events: [...s.events, event] }))
         return event
       },
@@ -59,7 +68,15 @@ export const useCalendarStore = create(
           events: s.events.map(e => {
             if (e.id !== id) return e
             const next = { ...e, ...patch }
-            next.xp = calcEventXp(next.difficulty, next.durationMin)
+            next.xp = isQuest(next) ? calcEventXp(next.difficulty, next.durationMin) : 0
+            // Turning a completed quest into a plain event would strand its
+            // XP — take the XP back and clear the completion first.
+            if (!isQuest(next) && e.completed) {
+              useGameStore.getState().grantXp(-e.xp)
+              next.completed = false
+              next.completedAt = null
+              next.completedDay = null
+            }
             return next
           }),
         }))
@@ -88,7 +105,7 @@ export const useCalendarStore = create(
        */
       toggleComplete(id, burstPos) {
         const event = get().events.find(e => e.id === id)
-        if (!event) return
+        if (!event || !isQuest(event)) return // plain events can't be completed
         const game = useGameStore.getState()
 
         if (!event.completed) {

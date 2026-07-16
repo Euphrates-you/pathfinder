@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { format } from 'date-fns'
-import { X, Trash2, Zap } from 'lucide-react'
+import { X, Trash2, Zap, Swords, CalendarDays } from 'lucide-react'
 import { useCalendarStore } from '../../stores/useCalendarStore'
 import { useUiStore } from '../../stores/useUiStore'
 import { CATEGORIES, DIFFICULTY } from '../../game/config'
@@ -29,7 +29,8 @@ export default function EventModal() {
   const [form, setForm] = useState(null)
   useEffect(() => {
     if (!modal) { setForm(null); return }
-    setForm(editing ? { ...editing } : {
+    setForm(editing ? { kind: 'quest', ...editing } : {
+      kind: 'quest',
       title: '',
       date: modal.defaults?.date ?? format(new Date(), 'yyyy-MM-dd'),
       startTime: modal.defaults?.startTime ?? '',
@@ -49,11 +50,12 @@ export default function EventModal() {
   }, [modal, closeModal])
 
   // Everything below is guarded so hooks above always run in the same order.
-  const xpPreview = form ? calcEventXp(form.difficulty, form.durationMin) : 0
+  const isQuestForm = form?.kind !== 'event'
+  const xpPreview = form && isQuestForm ? calcEventXp(form.difficulty, form.durationMin) : 0
   const set = (patch) => setForm(f => ({ ...f, ...patch }))
 
   const save = () => {
-    const data = { ...form, title: form.title.trim() || 'Untitled quest' }
+    const data = { ...form, title: form.title.trim() || (isQuestForm ? 'Untitled quest' : 'Untitled event') }
     if (editing) updateEvent(editing.id, data)
     else addEvent(data)
     play('click')
@@ -88,12 +90,14 @@ export default function EventModal() {
           {/* header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-edge">
             <h2 className="font-display font-bold text-lg text-ink">
-              {editing ? 'Edit quest' : 'New quest'}
+              {editing ? 'Edit' : 'New'} {isQuestForm ? 'quest' : 'event'}
             </h2>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold text-gold bg-surface-2 border border-gold/30 tabular-nums flex items-center gap-1">
-                <Zap size={11} aria-hidden /> {xpPreview} XP
-              </span>
+              {isQuestForm && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold text-gold bg-surface-2 border border-gold/30 tabular-nums flex items-center gap-1">
+                  <Zap size={11} aria-hidden /> {xpPreview} XP
+                </span>
+              )}
               <button onClick={closeModal} aria-label="Close"
                 className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 cursor-pointer">
                 <X size={17} />
@@ -102,6 +106,33 @@ export default function EventModal() {
           </div>
 
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* quest vs plain event toggle */}
+            <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Entry type">
+              {[
+                { id: 'quest', label: 'Quest', hint: 'Complete it for XP', Icon: Swords },
+                { id: 'event', label: 'Event', hint: 'Just a schedule entry', Icon: CalendarDays },
+              ].map(({ id, label: l, hint, Icon }) => {
+                const active = (form.kind ?? 'quest') === id
+                return (
+                  <button key={id} role="radio" aria-checked={active}
+                    onClick={() => set({ kind: id })}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer text-left transition-all duration-150 ${
+                      active ? 'border-transparent' : 'border-edge hover:border-ink-muted'
+                    }`}
+                    style={active ? {
+                      background: 'color-mix(in oklab, var(--accent) 14%, var(--surface-2))',
+                      boxShadow: 'inset 0 0 0 1px var(--accent)',
+                    } : undefined}
+                  >
+                    <Icon size={16} className={active ? 'text-accent' : 'text-ink-muted'} aria-hidden />
+                    <span>
+                      <span className={`block text-sm font-semibold ${active ? 'text-ink' : 'text-ink-muted'}`}>{l}</span>
+                      <span className="block text-[10px] text-ink-muted">{hint}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
             {/* title */}
             <div>
               <label htmlFor="ev-title" className={label}>Title</label>
@@ -162,7 +193,8 @@ export default function EventModal() {
               </div>
             </div>
 
-            {/* difficulty = Solo-Leveling gate ranks, with XP values */}
+            {/* difficulty = Solo-Leveling gate ranks, with XP values (quests only) */}
+            {isQuestForm && (
             <div>
               <span className={label}>Gate rank</span>
               <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Difficulty">
@@ -193,6 +225,7 @@ export default function EventModal() {
                 })}
               </div>
             </div>
+            )}
 
             {/* notes */}
             <div>
@@ -218,7 +251,7 @@ export default function EventModal() {
             <motion.button whileTap={{ scale: 0.96 }} onClick={save}
               className="px-5 py-2 rounded-lg text-sm font-semibold text-white cursor-pointer glow-accent"
               style={{ background: 'linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 65%, var(--accent-2)))' }}>
-              {editing ? 'Save changes' : 'Add quest'}
+              {editing ? 'Save changes' : isQuestForm ? 'Add quest' : 'Add event'}
             </motion.button>
           </div>
         </motion.div>

@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react'
 import { CATEGORIES, DIFFICULTY } from '../../game/config'
 import { useUiStore } from '../../stores/useUiStore'
+import { isQuest } from '../../stores/useCalendarStore'
 import CompleteButton from './CompleteButton'
 
 export default function EventChip({ event }) {
@@ -10,6 +11,7 @@ export default function EventChip({ event }) {
   const setDraggingId = useUiStore(s => s.setDraggingId)
   const draggingId = useUiStore(s => s.draggingId)
   const cat = CATEGORIES[event.category] ?? CATEGORIES.work
+  const quest = isQuest(event)
 
   return (
     <div
@@ -29,9 +31,18 @@ export default function EventChip({ event }) {
         // While dragging something, chips shouldn't swallow the drop:
         pointerEvents: draggingId && draggingId !== event.id ? 'none' : undefined,
       }}
-      title={`${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`}
+      title={quest
+        ? `${event.title} · ${DIFFICULTY[event.difficulty]?.label} · ${event.xp} XP`
+        : `${event.title}${event.startTime ? ` · ${event.startTime}` : ''}`}
     >
-      <span className="size-1.5 rounded-full shrink-0" style={{ background: cat.color }} aria-hidden />
+      {/* solid dot = quest, hollow ring = plain schedule entry */}
+      <span
+        className="size-1.5 rounded-full shrink-0"
+        style={quest
+          ? { background: cat.color }
+          : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${cat.color}` }}
+        aria-hidden
+      />
       <span className={`flex-1 truncate font-medium text-ink ${event.completed ? 'line-through' : ''}`}>
         {event.title}
       </span>

@@ -35,11 +35,18 @@ const DIFFICULTY_IDS = Object.keys(DIFFICULTY)
 
 const EVENT_PROPS = {
   title: { type: 'string' },
+  kind: {
+    type: 'string',
+    enum: ['quest', 'event'],
+    description:
+      'quest = a task the player completes for XP (study session, workout, chores). ' +
+      'event = a plain schedule entry with no XP and no checkbox (class, appointment, school, practice, birthday).',
+  },
   date: { type: 'string', description: 'yyyy-MM-dd' },
   startTime: { type: 'string', description: 'HH:mm 24h, or "" for any time' },
   durationMin: { type: 'integer' },
   category: { type: 'string', enum: CATEGORY_IDS },
-  difficulty: { type: 'string', enum: DIFFICULTY_IDS },
+  difficulty: { type: 'string', enum: DIFFICULTY_IDS, description: 'quests only — ignored for kind=event' },
   notes: { type: 'string' },
 }
 
@@ -149,7 +156,9 @@ export const TOOLS = [
 // Returns a string that gets sent back to Claude as the result.
 // ------------------------------------------------------------
 const briefEvent = (e) =>
-  `${e.id} | ${e.date} ${e.startTime || 'any'} | ${e.title} | ${e.category}/${e.difficulty} | ${e.durationMin}min | ${e.xp}xp${e.completed ? ' | DONE' : ''}`
+  e.kind === 'event'
+    ? `${e.id} | ${e.date} ${e.startTime || 'any'} | ${e.title} | EVENT | ${e.category} | ${e.durationMin}min`
+    : `${e.id} | ${e.date} ${e.startTime || 'any'} | ${e.title} | ${e.category}/${e.difficulty} | ${e.durationMin}min | ${e.xp}xp${e.completed ? ' | DONE' : ''}`
 
 export function executeTool(name, input) {
   const cal = useCalendarStore.getState()
@@ -259,6 +268,10 @@ Player: level ${level}, ${rank.name}, ${game.totalXp} lifetime XP, ${streakFromE
 
 Rules:
 - Use the tools to act on the calendar and settings. Never claim you did something without a successful tool result.
+- Two kinds of calendar entries:
+  * kind "quest" — a task the player checks off for XP (study, workout, reading, chores). Default.
+  * kind "event" — a plain schedule entry: classes, school, hagwon/academy, appointments, practices, meetups, birthdays. No XP, no checkbox.
+  Infer the kind from what the thing IS. When genuinely ambiguous, default to quest for solo effort activities and event for fixed commitments involving other people or institutions.
 - "Every Monday" style requests: compute the concrete dates yourself (default: the next 8 occurrences unless the user gives a range or count) and create them in ONE create_events call.
 - Before editing/deleting/completing, find the events with list_events first.
 - Categories: ${CATEGORY_IDS.join(', ')}. Difficulties: ${DIFFICULTY_IDS.join(', ')} (easy=E, medium=C, hard=A, epic=S gate ranks). Pick sensible defaults when the user doesn't specify (study → learning, gym → health).
